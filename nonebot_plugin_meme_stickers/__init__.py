@@ -9,12 +9,12 @@ from .config import ConfigModel
 
 __version__ = "0.1.0"
 __plugin_meta__ = PluginMetadata(
-    name="nonebot-plugin-example",
-    description="插件模板",
-    usage="这是一个一个一个插件模板",
+    name="Meme Stickers",
+    description="一站式制作 PJSK 样式表情包",
+    usage="暂无",
     type="application",
-    homepage="https://github.com/owner/nonebot-plugin-example",
+    homepage="https://github.com/lgc-NB2Dev/nonebot-plugin-meme-stickers",
     config=ConfigModel,
     supported_adapters=inherit_supported_adapters("nonebot_plugin_alconna"),
-    extra={"License": "MIT", "Author": "student_2333"},
+    extra={"License": "MIT", "Author": "LgCookie"},
 )
