@@ -1,8 +1,8 @@
 from textwrap import indent
-from typing import Literal, Optional
+from typing import Any, Literal, Optional, Union
 from typing_extensions import Self, TypeAlias
 
-from cookit.pyd import model_validator, type_dump_python
+from cookit.pyd import field_validator, model_validator, type_dump_python
 from pydantic import BaseModel, ValidationError
 
 SkiaTextAlignType: TypeAlias = Literal[
@@ -50,30 +50,42 @@ class StickerExternalFont(BaseModel):
     path: str
 
 
+class StickerPackConfig(BaseModel):
+    update_url: Optional[str] = None
+    commands: list[str] = []
+    extend_commands: list[str] = []
+    disable_character_select: bool = False
+
+
+def ensure_sticker_params(*params: StickerParamsOptional) -> StickerParams:
+    kw: dict[str, Any] = {}
+    for param in params:
+        kw.update(type_dump_python(param, exclude_defaults=True))
+    return StickerParams(**kw)
+
+
 class StickerPackManifest(BaseModel):
     version: int
-    commands: list[str]
+    name: str
+    description: str
     external_fonts: list[StickerExternalFont] = []
+    default_config: StickerPackConfig = StickerPackConfig()
     default_sticker_params: StickerParamsOptional = StickerParamsOptional()
     characters: dict[str, list[StickerParamsOptional]]
     files_sha256: dict[str, str] = {}
+
+    @field_validator("name")
+    def validate_name(cls, value: str) -> str:  # noqa: N805
+        if not value:
+            raise ValueError("Name must not be empty")
+        return value
 
     @model_validator(mode="after")
     def validate_stickers(self) -> Self:
         for character, stickers in self.characters.items():
             for idx, sticker in enumerate(stickers):
                 try:
-                    kw = {
-                        **type_dump_python(
-                            sticker,
-                            exclude_defaults=True,
-                        ),
-                        **type_dump_python(
-                            self.default_sticker_params,
-                            exclude_defaults=True,
-                        ),
-                    }
-                    StickerParams(**kw)
+                    ensure_sticker_params(self.default_sticker_params, sticker)
                 except ValidationError as e:
                     raise ValueError(
                         f"Character {character} sticker {idx} validation failed"
@@ -85,21 +97,39 @@ class StickerPackManifest(BaseModel):
 MANIFEST_FILENAME = "manifest.json"
 
 
-class StickerPackConfig(BaseModel):
-    update_url: Optional[str] = None
-    command_alias: list[str] = []
+class ManifestSourceGitHub(BaseModel):
+    type: Literal["github"] = "github"  # type: ignore[reportGeneralTypeIssues]
+    owner: str
+    repo: str
+    branch: str
+    path: str
 
 
-STICKERS_HUB_MANIFEST_URL = (
-    "https://raw.githubusercontent.com/lgc-NB2Dev/meme-stickers-hub"
-    "/refs/heads/main/hub_manifest.json"
+class ManifestSourceURL(BaseModel):
+    type: Literal["url"] = "url"
+    url: str
+
+
+ManifestSource: TypeAlias = Union[ManifestSourceGitHub, ManifestSourceURL]
+
+
+StickersHubManifestSource = ManifestSourceGitHub(
+    owner="lgc-NB2Dev",
+    repo="meme-stickers-hub",
+    branch="main",
+    path="manifest.json",
 )
 
 
 class HubStickerPackInfo(BaseModel):
-    name: str
-    description: str
-    manifest_url: str
+    slug: str
+    manifest_source: ManifestSource
 
 
 HubManifest: TypeAlias = list[HubStickerPackInfo]
+
+
+CHECKSUM_FILENAME = "checksum.json"
+
+ChecksumDict: TypeAlias = dict[str, str]
+OptionalChecksumDict: TypeAlias = dict[str, Optional[str]]
