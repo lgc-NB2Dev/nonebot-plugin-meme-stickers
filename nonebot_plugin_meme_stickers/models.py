@@ -98,11 +98,11 @@ MANIFEST_FILENAME = "manifest.json"
 
 
 class ManifestSourceGitHub(BaseModel):
-    type: Literal["github"] = "github"  # type: ignore[reportGeneralTypeIssues]
+    type: Literal["github"] = "github"
     owner: str
     repo: str
-    branch: str
-    path: str
+    branch: Optional[str] = None
+    path: Optional[str] = None
 
 
 class ManifestSourceURL(BaseModel):
@@ -113,11 +113,17 @@ class ManifestSourceURL(BaseModel):
 ManifestSource: TypeAlias = Union[ManifestSourceGitHub, ManifestSourceURL]
 
 
+CHECKSUM_FILENAME = "checksum.json"
+
+ChecksumDict: TypeAlias = dict[str, str]
+OptionalChecksumDict: TypeAlias = dict[str, Optional[str]]
+
+
+HUB_MANIFEST_FILENAME = "manifest.json"
+
 StickersHubManifestSource = ManifestSourceGitHub(
     owner="lgc-NB2Dev",
     repo="meme-stickers-hub",
-    branch="main",
-    path="manifest.json",
 )
 
 
@@ -127,9 +133,3 @@ class HubStickerPackInfo(BaseModel):
 
 
 HubManifest: TypeAlias = list[HubStickerPackInfo]
-
-
-CHECKSUM_FILENAME = "checksum.json"
-
-ChecksumDict: TypeAlias = dict[str, str]
-OptionalChecksumDict: TypeAlias = dict[str, Optional[str]]
