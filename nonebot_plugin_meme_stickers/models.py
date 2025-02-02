@@ -11,6 +11,41 @@ SkiaTextAlignType: TypeAlias = Literal[
 SkiaFontStyleType: TypeAlias = Literal["bold", "bold_italic", "italic", "normal"]
 RGBAColorTuple: TypeAlias = tuple[int, int, int, int]
 
+MANIFEST_FILENAME = "manifest.json"
+CHECKSUM_FILENAME = "checksum.json"
+HUB_MANIFEST_FILENAME = "manifest.json"
+CONFIG_FILENAME = "config.json"
+
+
+class FileSourceGitHubBase(BaseModel):
+    type: Literal["github"] = "github"
+    owner: str
+    repo: str
+    path: Optional[str] = None
+
+
+class FileSourceGitHubBranch(FileSourceGitHubBase):
+    branch: str
+
+
+class FileSourceGitHubTag(FileSourceGitHubBase):
+    tag: str
+
+
+FileSourceGitHub: TypeAlias = Union[FileSourceGitHubBranch, FileSourceGitHubTag]
+
+
+class FileSourceURL(BaseModel):
+    type: Literal["url"] = "url"
+    url: str
+
+
+FileSource: TypeAlias = Union[
+    FileSourceGitHubBranch,
+    FileSourceGitHubTag,
+    FileSourceURL,
+]
+
 
 class StickerParams(BaseModel):
     width: int
@@ -51,7 +86,7 @@ class StickerExternalFont(BaseModel):
 
 
 class StickerPackConfig(BaseModel):
-    update_url: Optional[str] = None
+    update_source: Optional[FileSource] = None
     commands: list[str] = []
     extend_commands: list[str] = []
     disable_character_select: bool = False
@@ -94,42 +129,20 @@ class StickerPackManifest(BaseModel):
         return self
 
 
-MANIFEST_FILENAME = "manifest.json"
-
-
-class ManifestSourceGitHub(BaseModel):
-    type: Literal["github"] = "github"
-    owner: str
-    repo: str
-    branch: Optional[str] = None
-    path: Optional[str] = None
-
-
-class ManifestSourceURL(BaseModel):
-    type: Literal["url"] = "url"
-    url: str
-
-
-ManifestSource: TypeAlias = Union[ManifestSourceGitHub, ManifestSourceURL]
-
-
-CHECKSUM_FILENAME = "checksum.json"
-
 ChecksumDict: TypeAlias = dict[str, str]
 OptionalChecksumDict: TypeAlias = dict[str, Optional[str]]
 
-
-HUB_MANIFEST_FILENAME = "manifest.json"
-
-StickersHubManifestSource = ManifestSourceGitHub(
+StickersHubFileSource = FileSourceGitHubBranch(
     owner="lgc-NB2Dev",
     repo="meme-stickers-hub",
+    branch="main",
+    path=HUB_MANIFEST_FILENAME,
 )
 
 
 class HubStickerPackInfo(BaseModel):
     slug: str
-    manifest_source: ManifestSource
+    source: FileSource
 
 
 HubManifest: TypeAlias = list[HubStickerPackInfo]
