@@ -89,7 +89,7 @@ class StickerPackConfig(BaseModel):
     update_source: Optional[FileSource] = None
     commands: list[str] = []
     extend_commands: list[str] = []
-    disable_character_select: bool = False
+    disable_character_select: Optional[bool] = None
 
 
 def ensure_sticker_params(*params: StickerParamsOptional) -> StickerParams:
@@ -107,7 +107,6 @@ class StickerPackManifest(BaseModel):
     default_config: StickerPackConfig = StickerPackConfig()
     default_sticker_params: StickerParamsOptional = StickerParamsOptional()
     characters: dict[str, list[StickerParamsOptional]]
-    files_sha256: dict[str, str] = {}
 
     @field_validator("name")
     def validate_name(cls, value: str) -> str:  # noqa: N805

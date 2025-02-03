@@ -13,6 +13,7 @@ class ConfigModel(BaseModel):
         "https://raw.githubusercontent.com/{owner}/{repo}/{ref_path}/{path}"
     )
     meme_stickers_retry_times: int = 3
+    meme_stickers_req_concurrency: int = 8
 
 
 config: ConfigModel = get_plugin_config(ConfigModel)
