@@ -8,8 +8,7 @@ from typing import Optional
 from typing_extensions import Unpack
 
 from cookit.loguru import warning_suppress
-from cookit.pyd import type_validate_json
-from cookit.pyd.compat import type_dump_python
+from cookit.pyd import type_dump_python, type_validate_json
 from nonebot import logger
 
 from .config import config
