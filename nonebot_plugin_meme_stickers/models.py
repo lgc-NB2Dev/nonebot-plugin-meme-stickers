@@ -81,6 +81,12 @@ class StickerParamsOptional(BaseModel):
     font_families: Optional[list[str]] = None
 
 
+class StickerInfo(BaseModel):
+    name: str
+    category: str
+    params: StickerParamsOptional
+
+
 class StickerExternalFont(BaseModel):
     path: str
 
@@ -89,14 +95,14 @@ class StickerPackConfig(BaseModel):
     update_source: Optional[FileSource] = None
     commands: Optional[list[str]] = None
     extend_commands: list[str] = []
-    disable_character_select: Optional[bool] = None
+    disable_category_select: Optional[bool] = None
 
 
 class StickerPackConfigMerged(BaseModel):
     update_source: Optional[FileSource] = None
     commands: list[str] = []
     extend_commands: list[str] = []
-    disable_character_select: bool = False
+    disable_category_select: bool = False
 
 
 def merge_ensure_sticker_params(*params: StickerParamsOptional) -> StickerParams:
@@ -113,7 +119,7 @@ class StickerPackManifest(BaseModel):
     external_fonts: list[StickerExternalFont] = []
     default_config: StickerPackConfig = StickerPackConfig()
     default_sticker_params: StickerParamsOptional = StickerParamsOptional()
-    characters: dict[str, list[StickerParamsOptional]]
+    stickers: list[StickerInfo]
 
     @field_validator("name")
     def validate_name(cls, value: str) -> str:  # noqa: N805
@@ -123,15 +129,12 @@ class StickerPackManifest(BaseModel):
 
     @model_validator(mode="after")
     def validate_stickers(self) -> Self:
-        for character, stickers in self.characters.items():
-            for idx, sticker in enumerate(stickers):
-                try:
-                    merge_ensure_sticker_params(self.default_sticker_params, sticker)
-                except ValidationError as e:
-                    raise ValueError(
-                        f"Character {character} sticker {idx} validation failed"
-                        f"\n{indent(str(e), '    ')}",
-                    ) from e
+        for idx, sticker in enumerate(self.stickers):
+            try:
+                merge_ensure_sticker_params(self.default_sticker_params, sticker.params)
+            except ValidationError as e:
+                info = indent(str(e), "    ")
+                raise ValueError(f"Sticker {idx} validation failed\n{info}") from e
         return self
 
 

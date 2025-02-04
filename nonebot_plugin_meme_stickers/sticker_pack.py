@@ -188,8 +188,7 @@ def collect_manifest_files(manifest: StickerPackManifest) -> list[str]:
     files: list[str] = []
     if manifest.default_sticker_params.base_image:
         files.append(manifest.default_sticker_params.base_image)
-    for char in manifest.characters.values():
-        files.extend(x.base_image for x in char if x.base_image)
+    files.extend(img for x in manifest.stickers if (img := x.params.base_image))
     return files
 
 
@@ -384,7 +383,7 @@ class StickerPackManager:
 
         async def up(info: HubStickerPackInfo, manifest: StickerPackManifest) -> bool:
             with logged_suppress(f"Update sticker pack `{info.slug}` failed"):
-                await update_sticker_pack(info, manifest)
+                await update_sticker_pack(info, manifest, sem=global_req_sem)
                 return True
             return False
 
