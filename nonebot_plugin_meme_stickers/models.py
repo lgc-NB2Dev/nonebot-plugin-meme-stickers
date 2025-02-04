@@ -87,12 +87,19 @@ class StickerExternalFont(BaseModel):
 
 class StickerPackConfig(BaseModel):
     update_source: Optional[FileSource] = None
-    commands: list[str] = []
+    commands: Optional[list[str]] = None
     extend_commands: list[str] = []
     disable_character_select: Optional[bool] = None
 
 
-def ensure_sticker_params(*params: StickerParamsOptional) -> StickerParams:
+class StickerPackConfigMerged(BaseModel):
+    update_source: Optional[FileSource] = None
+    commands: list[str] = []
+    extend_commands: list[str] = []
+    disable_character_select: bool = False
+
+
+def merge_ensure_sticker_params(*params: StickerParamsOptional) -> StickerParams:
     kw: dict[str, Any] = {}
     for param in params:
         kw.update(type_dump_python(param, exclude_defaults=True))
@@ -119,7 +126,7 @@ class StickerPackManifest(BaseModel):
         for character, stickers in self.characters.items():
             for idx, sticker in enumerate(stickers):
                 try:
-                    ensure_sticker_params(self.default_sticker_params, sticker)
+                    merge_ensure_sticker_params(self.default_sticker_params, sticker)
                 except ValidationError as e:
                     raise ValueError(
                         f"Character {character} sticker {idx} validation failed"

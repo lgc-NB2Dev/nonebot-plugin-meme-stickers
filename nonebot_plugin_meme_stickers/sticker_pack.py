@@ -2,12 +2,14 @@ import asyncio
 import hashlib
 import json
 import shutil
+from functools import cached_property
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from typing import Optional
 from typing_extensions import Unpack
 
 from cookit.loguru import warning_suppress
+from cookit.loguru.common import logged_suppress
 from cookit.pyd import type_dump_python, type_validate_json
 from nonebot import logger
 
@@ -21,6 +23,7 @@ from .models import (
     HubManifest,
     HubStickerPackInfo,
     StickerPackConfig,
+    StickerPackConfigMerged,
     StickerPackManifest,
     StickersHubFileSource,
 )
@@ -31,6 +34,86 @@ from .source_fetch import (
     fetch_source,
     global_req_sem,
 )
+
+
+class StickerPack:
+    def __init__(
+        self,
+        base_path: Path,
+        manifest_init: Optional[StickerPackManifest] = None,
+        config_init: Optional[StickerPackConfig] = None,
+    ):
+        self.base_path = base_path
+        if manifest_init:
+            self.manifest = manifest_init
+            self.save_manifest()
+        else:
+            self.reload_manifest()
+
+        if config_init:
+            self.config = config_init
+            self.save_config()
+        else:
+            self.reload_config()
+
+    @cached_property
+    def manifest_path(self):
+        return self.base_path / MANIFEST_FILENAME
+
+    @cached_property
+    def config_path(self):
+        return self.base_path / CONFIG_FILENAME
+
+    def reload_manifest(self):
+        self.manifest = type_validate_json(
+            StickerPackManifest,
+            self.manifest_path.read_text("u8"),
+        )
+
+    def reload_config(self):
+        if self.config_path.exists():
+            self.config: StickerPackConfig = type_validate_json(
+                StickerPackConfig,
+                self.config_path.read_text("u8"),
+            )
+        else:
+            self.config = StickerPackConfig()
+            self.save_config()
+
+    def reload(self):
+        self.reload_manifest()
+        self.reload_config()
+
+    @property
+    def merged_config(self) -> StickerPackConfigMerged:
+        return StickerPackConfigMerged(
+            **{
+                **type_dump_python(
+                    self.manifest.default_config,
+                    exclude_defaults=True,
+                    exclude_none=True,
+                ),
+                **type_dump_python(
+                    self.config,
+                    exclude_defaults=True,
+                    exclude_none=True,
+                ),
+            },
+        )
+
+    def save_config(self):
+        (self.base_path / CONFIG_FILENAME).write_text(
+            dump_readable_model(self.config),
+        )
+
+    def save_manifest(self):
+        (self.base_path / MANIFEST_FILENAME).write_text(
+            dump_readable_model(self.manifest, exclude_defaults=True),
+        )
+
+    def save(self):
+        self.save_config()
+        self.save_manifest()
 
 
 async def fetch_hub(**req_kw: Unpack[ReqKwargs]) -> HubManifest:
@@ -50,6 +133,15 @@ async def fetch_manifest(
     )
 
 
+async def fetch_optional_manifest(
+    source: FileSource,
+    **req_kw: Unpack[ReqKwargs],
+) -> Optional[StickerPackManifest]:
+    with warning_suppress(f"Failed to fetch manifest from {source}"):
+        return await fetch_manifest(source, **req_kw)
+    return None
+
+
 async def fetch_checksum(
     source: FileSource,
     **req_kw: Unpack[ReqKwargs],
@@ -60,17 +152,26 @@ async def fetch_checksum(
     )
 
 
+async def fetch_optional_checksum(
+    source: FileSource,
+    **req_kw: Unpack[ReqKwargs],
+) -> Optional[ChecksumDict]:
+    with warning_suppress(f"Failed to fetch checksum from {source}"):
+        return await fetch_checksum(source, **req_kw)
+    return None
+
+
 async def fetch_hub_and_packs(
     **req_kw: Unpack[ReqKwargs],
 ) -> tuple[HubManifest, dict[str, StickerPackManifest]]:
+    if "sem" not in req_kw:
+        req_kw["sem"] = global_req_sem
+
     hub = await fetch_hub(**req_kw)
 
-    async def fetch(source: FileSource) -> Optional[StickerPackManifest]:
-        with warning_suppress(f"Failed to fetch manifest from {source}"):
-            return await fetch_manifest(source, **req_kw)
-        return None
-
-    packs = await asyncio.gather(*(fetch(x.source) for x in hub))
+    packs = await asyncio.gather(
+        *(fetch_optional_manifest(x.source, **req_kw) for x in hub),
+    )
     packs_dict = {h.slug: p for h, p in zip(hub, packs) if p is not None}
     return hub, packs_dict
 
@@ -120,7 +221,7 @@ async def update_sticker_pack(
     info: HubStickerPackInfo,
     manifest: Optional[StickerPackManifest] = None,
     **req_kw: Unpack[ReqKwargs],
-):
+) -> StickerPack:
     if "cli" not in req_kw:
         req_kw["cli"] = create_client()
 
@@ -128,10 +229,8 @@ async def update_sticker_pack(
         logger.debug(f"Fetching manifest of pack `{info.slug}`")
         manifest = await fetch_manifest(info.source, **req_kw)
 
-    checksum = {}
     logger.debug(f"Fetching resource file checksums of pack `{info.slug}`")
-    with warning_suppress(f"Failed to fetch checksum from source {info.source}"):
-        checksum = await fetch_checksum(info.source, **req_kw)
+    checksum = await fetch_optional_checksum(info.source, **req_kw)
 
     logger.debug(f"Collecting files need to update for pack `{info.slug}`")
     base_path = config.meme_stickers_data_dir / info.slug
@@ -148,12 +247,15 @@ async def update_sticker_pack(
     # 2. files both exists in local and remote,
     #    but checksum not match, or not exist in remote checksum
     file_both_exist = set(local_files) & set(remote_files)
-    both_exist_checksum = {
-        x: calc_checksum_from_file(base_path / x) for x in file_both_exist
-    }
-    files_should_download.update(
-        x for x, c in both_exist_checksum.items() if checksum.get(x) != c
-    )
+    if checksum:
+        both_exist_checksum = {
+            x: calc_checksum_from_file(base_path / x) for x in file_both_exist
+        }
+        files_should_download.update(
+            x for x, c in both_exist_checksum.items() if checksum.get(x) != c
+        )
+    else:
+        files_should_download.update(file_both_exist)
 
     download_total = len(files_should_download)
 
@@ -223,21 +325,76 @@ async def update_sticker_pack(
             p.rmdir()
 
     logger.debug(f"Updating manifest and config of pack `{info.slug}`")
-
-    # update manifest
-    manifest_path = base_path / MANIFEST_FILENAME
-    manifest_path.write_text(dump_readable_model(manifest, exclude_defaults=True))
-
-    # update update_source from config
-    config_path = base_path / CONFIG_FILENAME
-    if not config_path.exists():
-        config_data = StickerPackConfig()
-    else:
-        config_data = type_validate_json(
-            StickerPackConfig,
-            config_path.read_text("u8"),
-        )
-    config_data.update_source = info.source
-    config_path.write_text(dump_readable_model(config_data))
+    pack = StickerPack(
+        base_path=base_path,
+        manifest_init=manifest,
+    )
+    pack.config.update_source = info.source
+    pack.save_config()
 
     logger.info(f"Successfully updated pack `{info.slug}`")
+    return pack
+
+
+class StickerPackManager:
+    def __init__(self, base_path: Path) -> None:
+        self.base_path = base_path
+        self.packs: dict[str, StickerPack] = {}
+        self.reload()
+
+    def reload(self):
+        self.packs.clear()
+        paths = (
+            self.base_path / x
+            for x in self.base_path.iterdir()
+            if x.is_dir() and (x / MANIFEST_FILENAME).exists()
+        )
+        for path in paths:
+            with warning_suppress(f"Failed to load pack `{path.name}`"):
+                self.packs[path.name] = StickerPack(path)
+                logger.debug(f"Successfully loaded pack `{path.name}`")
+        logger.success(f"Successfully loaded {len(self.packs)} packs")
+
+    async def update(self):
+        logger.info("Collecting sticker packs need to update")
+        update_packs_info = [
+            HubStickerPackInfo(slug=k, source=s)
+            for k, v in self.packs.items()
+            if (s := v.merged_config.update_source)
+        ]
+        update_packs_manifest = await asyncio.gather(
+            *(
+                fetch_optional_manifest(x.source, sem=global_req_sem)
+                for x in update_packs_info
+            ),
+        )
+        packs_will_update: list[tuple[HubStickerPackInfo, StickerPackManifest]] = []
+        for x, m in zip(update_packs_info, update_packs_manifest):
+            local_v = self.packs[x.slug].manifest.version
+            if m and local_v < m.version:
+                packs_will_update.append((x, m))
+            else:
+                logger.debug(
+                    f"Skip update sticker pack `{x.slug}`"
+                    f" (local ver {local_v}, remote ver {m.version if m else 'Unknown'})",
+                )
+
+        for x in packs_will_update:
+            del self.packs[x[0].slug]
+
+        async def up(info: HubStickerPackInfo, manifest: StickerPackManifest) -> bool:
+            with logged_suppress(f"Update sticker pack `{info.slug}` failed"):
+                await update_sticker_pack(info, manifest)
+                return True
+            return False
+
+        logger.info(f"Updating {len(packs_will_update)} sticker packs")
+        results = await asyncio.gather(*(up(*x) for x in packs_will_update))
+        self.reload()
+
+        true_count = sum(1 for x in results if x)
+        false_count = len(results) - true_count
+        logger.info(f"Update finished, {true_count} succeed, {false_count} failed")
+
+
+pack_manager = StickerPackManager(config.meme_stickers_data_dir)
