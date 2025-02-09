@@ -1,8 +1,11 @@
 # ruff: noqa: INP001
 
 import math
+from pathlib import Path
 
 import skia
+
+from .models import SkiaFontStyleType, SkiaTextAlignType, StickerParams
 
 font_mgr = skia.FontMgr()
 font_collection = skia.textlayout.FontCollection()
@@ -107,6 +110,9 @@ def calc_rotated_bounding_box_xywh(
 
 
 def draw_sticker(
+    surface: skia.Surface,
+    x: float,
+    y: float,
     width: int,
     height: int,
     base_image: skia.Image,
@@ -198,7 +204,6 @@ def draw_sticker(
     else:
         stroke_paragraph = None
 
-    surface = skia.Surface(width, height)
     with surface as canvas:
         ratio = min(width / base_image.width(), height / base_image.height())
         resized_width = base_image.width() * ratio
@@ -212,7 +217,7 @@ def draw_sticker(
             skia.SamplingOptions(skia.FilterMode.kLinear),
         )
         with skia.AutoCanvasRestore(canvas):
-            canvas.drawImage(img, top_left_offset_x, top_left_offset_y)
+            canvas.drawImage(img, x + top_left_offset_x, y + top_left_offset_y)
 
         if debug_bounding_box:
             box_paint = skia.Paint()
@@ -220,16 +225,24 @@ def draw_sticker(
             box_paint.setStyle(skia.Paint.kStroke_Style)
             box_paint.setStrokeWidth(2)
 
+            # image box (blue)
+            with skia.AutoCanvasRestore(canvas):
+                rect = skia.Rect.MakeXYWH(x, y, width, height)
+                paint = skia.Paint(box_paint)
+                paint.setColor(0xFF0000FF)
+                canvas.drawRect(rect, paint)
+
             # bounding box (red)
             with skia.AutoCanvasRestore(canvas):
-                rect = skia.Rect.MakeXYWH(*calc_text_rotated_xywh())
+                bx, by, bw, bh = calc_text_rotated_xywh()
+                rect = skia.Rect.MakeXYWH(bx + x, by + y, bw, bh)
                 paint = skia.Paint(box_paint)
                 paint.setColor(0xFFFF0000)
                 canvas.drawRect(rect, paint)
 
             # text box (green)
             with skia.AutoCanvasRestore(canvas):
-                canvas.translate(text_x, text_y)
+                canvas.translate(x + text_x, y + text_y)
                 canvas.rotate(text_rotate_degrees)
 
                 _, _, w, h = get_text_original_xywh()
@@ -246,7 +259,7 @@ def draw_sticker(
                 canvas.drawRect(rect, paint)
 
         with skia.AutoCanvasRestore(canvas):
-            canvas.translate(text_x, text_y)
+            canvas.translate(x + text_x, y + text_y)
             canvas.rotate(text_rotate_degrees)
 
             offset_x, offset_y = get_text_draw_offset()
@@ -256,3 +269,57 @@ def draw_sticker(
             fg_paragraph.paint(canvas, 0, 0)
 
     return surface
+
+
+def transform_text_align(text_align: SkiaTextAlignType) -> skia.textlayout_TextAlign:
+    return {
+        "center": skia.textlayout_TextAlign.kCenter,
+        "end": skia.textlayout_TextAlign.kEnd,
+        "justify": skia.textlayout_TextAlign.kJustify,
+        "left": skia.textlayout_TextAlign.kLeft,
+        "right": skia.textlayout_TextAlign.kRight,
+        "start": skia.textlayout_TextAlign.kStart,
+    }[text_align]
+
+
+def transform_font_style(font_style: SkiaFontStyleType) -> skia.FontStyle:
+    return {
+        "bold": skia.FontStyle.Bold,
+        "bold_italic": skia.FontStyle.BoldItalic,
+        "italic": skia.FontStyle.Italic,
+        "normal": skia.FontStyle.Normal,
+    }[font_style]()
+
+
+def draw_sticker_from_params(
+    surface: skia.Surface,
+    x: float,
+    y: float,
+    base_path: Path,
+    params: StickerParams,
+    auto_resize: bool = False,
+    debug_bounding_box: bool = False,
+) -> skia.Surface:
+    return draw_sticker(
+        surface,
+        x,
+        y,
+        params.width,
+        params.height,
+        skia.Image.MakeFromEncoded(
+            skia.Data.MakeFromFileName(str(base_path / params.base_image)),
+        ),
+        params.text,
+        params.text_x,
+        params.text_y,
+        transform_text_align(params.text_align),
+        params.text_rotate_degrees,
+        skia.Color(*params.text_color),
+        skia.Color(*params.stroke_color),
+        params.stroke_width_factor,
+        params.font_size,
+        transform_font_style(params.font_style),
+        params.font_families,
+        auto_resize=auto_resize,
+        debug_bounding_box=debug_bounding_box,
+    )

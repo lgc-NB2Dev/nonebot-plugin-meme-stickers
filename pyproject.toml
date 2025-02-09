@@ -5,9 +5,9 @@ description = "Make PJSK like meme stickers in one place"
 authors = [{ name = "LgCookie", email = "lgc2333@126.com" }]
 dependencies = [
     "nonebot2>=2.4.1",
-    "nonebot-plugin-alconna>=0.54.2",
+    "nonebot-plugin-alconna>=0.55.1",
     "skia-python>=132.0b11",
-    "cookit[loguru,pydantic]>=0.9.3",
+    "cookit[loguru,pydantic]>=0.9.4",
     "httpx>=0.27.2",
     "tenacity>=9.0.0",
 ]

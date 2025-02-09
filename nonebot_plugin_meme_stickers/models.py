@@ -3,7 +3,8 @@ from typing import Any, Literal, Optional, Union
 from typing_extensions import Self, TypeAlias
 
 from cookit.pyd import field_validator, model_validator, type_dump_python
-from pydantic import BaseModel, ValidationError
+from cookit.pyd.compat import type_validate_python
+from pydantic import BaseModel, PrivateAttr, ValidationError
 
 SkiaTextAlignType: TypeAlias = Literal[
     "center", "end", "justify", "left", "right", "start"  # noqa: COM812
@@ -15,6 +16,7 @@ MANIFEST_FILENAME = "manifest.json"
 CHECKSUM_FILENAME = "checksum.json"
 HUB_MANIFEST_FILENAME = "manifest.json"
 CONFIG_FILENAME = "config.json"
+UPDATING_FLAG_FILENAME = ".updating"
 
 
 class FileSourceGitHubBase(BaseModel):
@@ -81,10 +83,16 @@ class StickerParamsOptional(BaseModel):
     font_families: Optional[list[str]] = None
 
 
-class StickerInfo(BaseModel):
+class StickerInfoOptionalParams(BaseModel):
     name: str
     category: str
     params: StickerParamsOptional
+
+
+class StickerInfo(BaseModel):
+    name: str
+    category: str
+    params: StickerParams
 
 
 class StickerExternalFont(BaseModel):
@@ -94,14 +102,12 @@ class StickerExternalFont(BaseModel):
 class StickerPackConfig(BaseModel):
     update_source: Optional[FileSource] = None
     commands: Optional[list[str]] = None
-    extend_commands: list[str] = []
     disable_category_select: Optional[bool] = None
 
 
 class StickerPackConfigMerged(BaseModel):
     update_source: Optional[FileSource] = None
     commands: list[str] = []
-    extend_commands: list[str] = []
     disable_category_select: bool = False
 
 
@@ -116,10 +122,19 @@ class StickerPackManifest(BaseModel):
     version: int
     name: str
     description: str
-    external_fonts: list[StickerExternalFont] = []
     default_config: StickerPackConfig = StickerPackConfig()
     default_sticker_params: StickerParamsOptional = StickerParamsOptional()
-    stickers: list[StickerInfo]
+    external_fonts: list[StickerExternalFont] = []
+    stickers: list[StickerInfoOptionalParams]
+
+    _resolved_stickers: list[StickerInfo] = PrivateAttr([])
+
+    @property
+    def resolved_stickers(self) -> list[StickerInfo]:
+        return self._resolved_stickers
+
+    def resolve_sticker_params(self, *args: StickerParamsOptional) -> StickerParams:
+        return merge_ensure_sticker_params(self.default_sticker_params, *args)
 
     @field_validator("name")
     def validate_name(cls, value: str) -> str:  # noqa: N805
@@ -128,13 +143,23 @@ class StickerPackManifest(BaseModel):
         return value
 
     @model_validator(mode="after")
-    def validate_stickers(self) -> Self:
+    def validate_resolve_stickers(self) -> Self:
+        resolved_stickers: list[StickerInfo] = []
         for idx, sticker in enumerate(self.stickers):
             try:
-                merge_ensure_sticker_params(self.default_sticker_params, sticker.params)
+                resolved_stickers.append(
+                    type_validate_python(
+                        StickerInfo,
+                        {
+                            **type_dump_python(sticker),
+                            "params": self.resolve_sticker_params(sticker.params),
+                        },
+                    ),
+                )
             except ValidationError as e:
                 info = indent(str(e), "    ")
                 raise ValueError(f"Sticker {idx} validation failed\n{info}") from e
+        self._resolved_stickers = resolved_stickers
         return self
 
 
