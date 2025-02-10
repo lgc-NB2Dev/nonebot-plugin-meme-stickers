@@ -2,8 +2,11 @@
 
 import math
 from pathlib import Path
+from typing import Optional
 
 import skia
+from cookit import chunks
+from cookit.pyd import model_copy
 
 from .models import SkiaFontStyleType, SkiaTextAlignType, StickerParams
 
@@ -109,6 +112,22 @@ def calc_rotated_bounding_box_xywh(
     return rotated_x, rotated_y, rotated_w, rotated_h
 
 
+def get_resize_ratio_and_size(
+    original_w: float,
+    original_h: float,
+    target_w: float,
+    target_h: float,
+) -> tuple[float, float, float]:
+    """
+    Returns:
+        (ratio, resized_w, resized_h)
+    """
+    ratio = min(target_w / original_w, target_h / original_h)
+    resized_w = original_w * ratio
+    resized_h = original_h * ratio
+    return ratio, resized_w, resized_h
+
+
 def draw_sticker(
     surface: skia.Surface,
     x: float,
@@ -205,9 +224,12 @@ def draw_sticker(
         stroke_paragraph = None
 
     with surface as canvas:
-        ratio = min(width / base_image.width(), height / base_image.height())
-        resized_width = base_image.width() * ratio
-        resized_height = base_image.height() * ratio
+        (ratio, resized_width, resized_height) = get_resize_ratio_and_size(
+            base_image.width(),
+            base_image.height(),
+            width,
+            height,
+        )
         top_left_offset_x = (width - resized_width) / 2
         top_left_offset_y = (height - resized_height) / 2
 
@@ -323,3 +345,68 @@ def draw_sticker_from_params(
         auto_resize=auto_resize,
         debug_bounding_box=debug_bounding_box,
     )
+
+
+def zoom_sticker(params: StickerParams, zoom: float) -> StickerParams:
+    params.text_x *= zoom
+    params.text_y *= zoom
+    params.font_size *= zoom
+    params.stroke_width_factor *= zoom
+    return params
+
+
+def draw_sticker_grid(
+    base_path: Path,
+    params: list[StickerParams],
+    rows: Optional[int] = None,
+    cols: Optional[int] = 5,
+    gap: float = 16,
+    padding: float = 16,
+    background_color: int = 0xFF282C34,
+) -> skia.Surface:
+    if (rows and cols) or ((not rows) and (not cols)):
+        raise ValueError("rows or cols must be specified, but not both or both None")
+
+    max_w = max(p.width for p in params)
+    max_h = max(p.height for p in params)
+
+    if rows:
+        cols = math.ceil(len(params) / rows)
+        splitted_stickers = chunks(params, cols)
+    else:
+        assert cols
+        splitted_stickers = chunks(params, cols)
+        rows = math.ceil(len(params) / cols)
+
+    surface_w = round(cols * max_w + (cols - 1) * gap + 2 * padding)
+    surface_h = round(rows * max_h + (rows - 1) * gap + 2 * padding)
+
+    surface = skia.Surface(surface_w, surface_h)
+
+    with surface as canvas:
+        canvas.drawColor(background_color)
+
+    grid_y_offset = padding
+    for row in splitted_stickers:
+        grid_x_offset = padding
+        for param in row:
+            ratio, rw, rh = get_resize_ratio_and_size(
+                param.width,
+                param.height,
+                max_w,
+                max_h,
+            )
+            param = zoom_sticker(model_copy(param), ratio)
+            x_offset = (max_w - rw) / 2
+            y_offset = (max_h - rh) / 2
+            draw_sticker_from_params(
+                surface,
+                grid_x_offset + x_offset,
+                grid_y_offset + y_offset,
+                base_path,
+                param,
+            )
+            grid_x_offset += max_w + gap
+        grid_y_offset += max_h + gap
+
+    return surface
