@@ -194,6 +194,7 @@ class StickerPackManifest(BaseModel):
     description: str
     default_config: StickerPackConfig = StickerPackConfig()
     default_sticker_params: StickerParamsOptional = StickerParamsOptional()
+    sticker_grid: StickerGridSetting = StickerGridSetting()
     external_fonts: list[StickerExternalFont] = []
     stickers: list[StickerInfoOptionalParams]
 

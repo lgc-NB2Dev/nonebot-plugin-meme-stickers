@@ -11,6 +11,7 @@ from cookit.pyd import model_copy
 from .models import (
     SkiaFontStyleType,
     SkiaTextAlignType,
+    StickerGridParams,
     StickerParams,
     TRBLPaddingTuple,
     XYGapTuple,
@@ -143,8 +144,8 @@ def get_resize_cover_ratio_and_offset(
     ratio = max(target_w / original_w, target_h / original_h)
     resized_w = original_w * ratio
     resized_h = original_h * ratio
-    offset_x = (resized_w - target_w) / 2
-    offset_y = (resized_h - target_h) / 2
+    offset_x = (target_w - resized_w) / 2
+    offset_y = (target_h - resized_h) / 2
     return ratio, offset_x, offset_y
 
 
@@ -337,6 +338,12 @@ def transform_font_style(font_style: SkiaFontStyleType) -> skia.FontStyle:
     }[font_style]()
 
 
+def read_file_to_skia_image(path: Union[Path, str]) -> skia.Image:
+    if isinstance(path, Path):
+        path = str(path)
+    return skia.Image.MakeFromEncoded(skia.Data.MakeFromFileName(path))
+
+
 def draw_sticker_from_params(
     surface: skia.Surface,
     x: float,
@@ -347,25 +354,23 @@ def draw_sticker_from_params(
     debug_bounding_box: bool = False,
 ) -> skia.Surface:
     return draw_sticker(
-        surface,
-        x,
-        y,
-        params.width,
-        params.height,
-        skia.Image.MakeFromEncoded(
-            skia.Data.MakeFromFileName(str(base_path / params.base_image)),
-        ),
-        params.text,
-        params.text_x,
-        params.text_y,
-        transform_text_align(params.text_align),
-        params.text_rotate_degrees,
-        skia.Color(*params.text_color),
-        skia.Color(*params.stroke_color),
-        params.stroke_width_factor,
-        params.font_size,
-        transform_font_style(params.font_style),
-        params.font_families,
+        surface=surface,
+        x=x,
+        y=y,
+        width=params.width,
+        height=params.height,
+        base_image=read_file_to_skia_image(base_path / params.base_image),
+        text=params.text,
+        text_x=params.text_x,
+        text_y=params.text_y,
+        text_align=transform_text_align(params.text_align),
+        text_rotate_degrees=params.text_rotate_degrees,
+        text_color=skia.Color(*params.text_color),
+        stroke_color=skia.Color(*params.stroke_color),
+        stroke_width_factor=params.stroke_width_factor,
+        font_size=params.font_size,
+        font_style=transform_font_style(params.font_style),
+        font_families=params.font_families,
         auto_resize=auto_resize,
         debug_bounding_box=debug_bounding_box,
     )
@@ -381,7 +386,7 @@ def zoom_sticker(params: StickerParams, zoom: float) -> StickerParams:
 
 def draw_sticker_grid(
     base_path: Path,
-    params: list[StickerParams],
+    stickers: list[StickerParams],
     padding: TRBLPaddingTuple = (16, 16, 16, 16),
     gap: XYGapTuple = (16, 16),
     rows: Optional[int] = None,
@@ -396,18 +401,18 @@ def draw_sticker_grid(
     gap_x, gap_y = gap
 
     if rows:
-        cols = math.ceil(len(params) / rows)
-        splitted_stickers = chunks(params, cols)
+        cols = math.ceil(len(stickers) / rows)
+        splitted_stickers = chunks(stickers, cols)
     else:
         assert cols
-        splitted_stickers = chunks(params, cols)
-        rows = math.ceil(len(params) / cols)
+        splitted_stickers = chunks(stickers, cols)
+        rows = math.ceil(len(stickers) / cols)
 
     if sticker_size_fixed:
         max_w, max_h = sticker_size_fixed
     else:
-        max_w = max(p.width for p in params)
-        max_h = max(p.height for p in params)
+        max_w = max(p.width for p in stickers)
+        max_h = max(p.height for p in stickers)
 
     surface_w = round(cols * max_w + (cols - 1) * gap_x + pad_l + pad_r)
     surface_h = round(rows * max_h + (rows - 1) * gap_y + pad_t + pad_b)
@@ -456,3 +461,24 @@ def draw_sticker_grid(
         grid_y_offset += max_h + gap_y
 
     return surface
+
+
+def draw_sticker_grid_from_params(
+    params: StickerGridParams,
+    stickers: list[StickerParams],
+    base_path: Path,
+) -> skia.Surface:
+    return draw_sticker_grid(
+        base_path=base_path,
+        stickers=stickers,
+        padding=params.resolved_padding,
+        gap=params.resolved_gap,
+        rows=params.rows,
+        cols=params.cols,
+        background=(
+            read_file_to_skia_image(base_path / params.background)
+            if isinstance(params.background, str)
+            else skia.Color(*params.background)
+        ),
+        sticker_size_fixed=params.sticker_size_fixed,
+    )
