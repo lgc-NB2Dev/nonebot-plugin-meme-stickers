@@ -3,11 +3,7 @@ from collections.abc import Awaitable
 from typing import TYPE_CHECKING, Any, Generic, Optional, Protocol, TypedDict, TypeVar
 from typing_extensions import Unpack
 
-from cookit import (
-    TypeDecoCollector,
-    copy_func_arg_annotations,
-    nullcontext,
-)
+from cookit import TypeDecoCollector, copy_func_arg_annotations, nullcontext
 from httpx import AsyncClient
 from yarl import URL
 

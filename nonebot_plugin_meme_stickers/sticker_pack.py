@@ -26,7 +26,6 @@ from .models import (
     HubManifest,
     HubStickerPackInfo,
     StickerPackConfig,
-    StickerPackConfigMerged,
     StickerPackManifest,
     StickersHubFileSource,
 )
@@ -59,7 +58,7 @@ class StickerPack:
         else:
             self.reload_config()
 
-        self._cached_merged_config: Optional[StickerPackConfigMerged] = None
+        self._cached_merged_config: Optional[StickerPackConfig] = None
 
     @cached_property
     def manifest_path(self):
@@ -91,24 +90,16 @@ class StickerPack:
         self.reload_config()
 
     @property
-    def merged_config(self) -> StickerPackConfigMerged:
+    def merged_config(self) -> StickerPackConfig:
         """
         remember to call `save_config` or `update_config` after modified config,
         merged_config cache will clear after these operations
         """
         if not self._cached_merged_config:
-            self._cached_merged_config = StickerPackConfigMerged(
+            self._cached_merged_config = StickerPackConfig(
                 **deep_merge(
-                    type_dump_python(
-                        self.manifest.default_config,
-                        exclude_defaults=True,
-                        exclude_none=True,
-                    ),
-                    type_dump_python(
-                        self.config,
-                        exclude_defaults=True,
-                        exclude_none=True,
-                    ),
+                    type_dump_python(self.manifest.default_config, exclude_unset=True),
+                    type_dump_python(self.config, exclude_unset=True),
                 ),
             )
         return self._cached_merged_config
@@ -116,12 +107,12 @@ class StickerPack:
     def save_config(self):
         self._cached_merged_config = None
         (self.base_path / CONFIG_FILENAME).write_text(
-            dump_readable_model(self.config),
+            dump_readable_model(self.config, exclude_unset=True),
         )
 
     def save_manifest(self):
         (self.base_path / MANIFEST_FILENAME).write_text(
-            dump_readable_model(self.manifest, exclude_defaults=True),
+            dump_readable_model(self.manifest, exclude_unset=True),
         )
 
     def save(self):

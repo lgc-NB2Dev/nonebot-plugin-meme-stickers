@@ -11,6 +11,19 @@ SkiaTextAlignType: TypeAlias = Literal[
 ]
 SkiaFontStyleType: TypeAlias = Literal["bold", "bold_italic", "italic", "normal"]
 RGBAColorTuple: TypeAlias = tuple[int, int, int, int]
+TRBLPaddingTuple: TypeAlias = tuple[float, float, float, float]
+StickerGridPaddingType: TypeAlias = Union[
+    float,  # t r b l
+    tuple[float],  # (t r b l)
+    tuple[float, float],  # (t b, l r)
+    tuple[float, float, float, float],  # (t, r, b, l)
+]
+XYGapTuple: TypeAlias = tuple[float, float]
+StickerGridGapType: TypeAlias = Union[
+    float,  # x and y
+    tuple[float],  # (x and y)
+    tuple[float, float],  # (x, y)
+]
 
 MANIFEST_FILENAME = "manifest.json"
 CHECKSUM_FILENAME = "checksum.json"
@@ -101,14 +114,71 @@ class StickerExternalFont(BaseModel):
 
 class StickerPackConfig(BaseModel):
     update_source: Optional[FileSource] = None
-    commands: Optional[list[str]] = None
-    disable_category_select: Optional[bool] = None
-
-
-class StickerPackConfigMerged(BaseModel):
-    update_source: Optional[FileSource] = None
     commands: list[str] = []
+
+
+class StickerGridParams(BaseModel):
+    padding: StickerGridPaddingType = 16
+    gap: StickerGridGapType = 16
+    rows: Optional[int] = None
+    cols: Optional[int] = 5
+    background: Union[RGBAColorTuple, str] = (40, 44, 52, 255)
+    sticker_size_fixed: Optional[tuple[int, int]] = None
+
+    @model_validator(mode="after")
+    def validate_rows_cols(self):
+        if (self.rows and self.cols) or ((self.rows is None) and (self.cols is None)):
+            raise ValueError("Either rows or cols must be None")
+        return self
+
+    @property
+    def resolved_padding(self) -> TRBLPaddingTuple:
+        if isinstance(self.padding, (int, float)):
+            return ((p := self.padding), p, p, p)
+        if len(self.padding) == 1:
+            return ((p := self.padding[0]), p, p, p)
+        if len(self.padding) == 2:
+            x, y = self.padding
+            return (x, y, x, y)
+        return self.padding
+
+    @property
+    def resolved_gap(self) -> XYGapTuple:
+        if isinstance(self.gap, (int, float)):
+            return ((g := self.gap), g)
+        if len(self.gap) == 1:
+            return ((g := self.gap[0]), g)
+        return self.gap
+
+
+class StickerGridSetting(BaseModel):
     disable_category_select: bool = False
+    default_params: StickerGridParams = StickerGridParams()
+    override_params: dict[str, dict[str, Any]] = {}
+
+    _resolved_overrides: dict[str, StickerGridParams] = PrivateAttr({})
+
+    @property
+    def resolved_overrides(self) -> dict[str, StickerGridParams]:
+        return self._resolved_overrides
+
+    @model_validator(mode="after")
+    def validate_resolve_overrides(self) -> Self:
+        for category, params in self.override_params.items():
+            try:
+                self._resolved_overrides[category] = type_validate_python(
+                    StickerGridParams,
+                    {
+                        **type_dump_python(self.default_params, exclude_unset=True),
+                        **params,
+                    },
+                )
+            except ValidationError as e:
+                info = indent(str(e), "    ")
+                raise ValueError(
+                    f"StickerGridSetting {category} validation failed\n{info}",
+                ) from e
+        return self
 
 
 def merge_ensure_sticker_params(*params: StickerParamsOptional) -> StickerParams:
@@ -151,7 +221,7 @@ class StickerPackManifest(BaseModel):
                     type_validate_python(
                         StickerInfo,
                         {
-                            **type_dump_python(sticker),
+                            **type_dump_python(sticker, exclude={"params"}),
                             "params": self.resolve_sticker_params(sticker.params),
                         },
                     ),

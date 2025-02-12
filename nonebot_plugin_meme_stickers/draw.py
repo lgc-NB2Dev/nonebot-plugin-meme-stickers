@@ -2,13 +2,19 @@
 
 import math
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Union
 
 import skia
 from cookit import chunks
 from cookit.pyd import model_copy
 
-from .models import SkiaFontStyleType, SkiaTextAlignType, StickerParams
+from .models import (
+    SkiaFontStyleType,
+    SkiaTextAlignType,
+    StickerParams,
+    TRBLPaddingTuple,
+    XYGapTuple,
+)
 
 font_mgr = skia.FontMgr()
 font_collection = skia.textlayout.FontCollection()
@@ -112,20 +118,34 @@ def calc_rotated_bounding_box_xywh(
     return rotated_x, rotated_y, rotated_w, rotated_h
 
 
-def get_resize_ratio_and_size(
+def get_resize_contain_ratio_and_size(
     original_w: float,
     original_h: float,
     target_w: float,
     target_h: float,
 ) -> tuple[float, float, float]:
-    """
-    Returns:
-        (ratio, resized_w, resized_h)
-    """
+    """Returns: (ratio, resized_w, resized_h)"""
+
     ratio = min(target_w / original_w, target_h / original_h)
     resized_w = original_w * ratio
     resized_h = original_h * ratio
     return ratio, resized_w, resized_h
+
+
+def get_resize_cover_ratio_and_offset(
+    original_w: float,
+    original_h: float,
+    target_w: float,
+    target_h: float,
+) -> tuple[float, float, float]:
+    """Returns: (ratio, offset_x, offset_y)"""
+
+    ratio = max(target_w / original_w, target_h / original_h)
+    resized_w = original_w * ratio
+    resized_h = original_h * ratio
+    offset_x = (resized_w - target_w) / 2
+    offset_y = (resized_h - target_h) / 2
+    return ratio, offset_x, offset_y
 
 
 def draw_sticker(
@@ -224,7 +244,7 @@ def draw_sticker(
         stroke_paragraph = None
 
     with surface as canvas:
-        (ratio, resized_width, resized_height) = get_resize_ratio_and_size(
+        (ratio, resized_width, resized_height) = get_resize_contain_ratio_and_size(
             base_image.width(),
             base_image.height(),
             width,
@@ -233,13 +253,17 @@ def draw_sticker(
         top_left_offset_x = (width - resized_width) / 2
         top_left_offset_y = (height - resized_height) / 2
 
-        img = base_image.resize(
-            round(resized_width),
-            round(resized_height),
-            skia.SamplingOptions(skia.FilterMode.kLinear),
-        )
         with skia.AutoCanvasRestore(canvas):
-            canvas.drawImage(img, x + top_left_offset_x, y + top_left_offset_y)
+            canvas.drawImageRect(
+                base_image,
+                skia.Rect.MakeXYWH(
+                    x + top_left_offset_x,
+                    y + top_left_offset_y,
+                    resized_width,
+                    resized_height,
+                ),
+                skia.SamplingOptions(skia.FilterMode.kLinear),
+            )
 
         if debug_bounding_box:
             box_paint = skia.Paint()
@@ -358,17 +382,18 @@ def zoom_sticker(params: StickerParams, zoom: float) -> StickerParams:
 def draw_sticker_grid(
     base_path: Path,
     params: list[StickerParams],
+    padding: TRBLPaddingTuple = (16, 16, 16, 16),
+    gap: XYGapTuple = (16, 16),
     rows: Optional[int] = None,
     cols: Optional[int] = 5,
-    gap: float = 16,
-    padding: float = 16,
-    background_color: int = 0xFF282C34,
+    background: Union[skia.Image, int] = 0xFF282C34,
+    sticker_size_fixed: Optional[tuple[int, int]] = None,
 ) -> skia.Surface:
-    if (rows and cols) or ((not rows) and (not cols)):
-        raise ValueError("rows or cols must be specified, but not both or both None")
+    if (rows and cols) or ((rows is None) and (cols is None)):
+        raise ValueError("Either rows or cols must be None")
 
-    max_w = max(p.width for p in params)
-    max_h = max(p.height for p in params)
+    pad_t, pad_r, pad_b, pad_l = padding
+    gap_x, gap_y = gap
 
     if rows:
         cols = math.ceil(len(params) / rows)
@@ -378,19 +403,40 @@ def draw_sticker_grid(
         splitted_stickers = chunks(params, cols)
         rows = math.ceil(len(params) / cols)
 
-    surface_w = round(cols * max_w + (cols - 1) * gap + 2 * padding)
-    surface_h = round(rows * max_h + (rows - 1) * gap + 2 * padding)
+    if sticker_size_fixed:
+        max_w, max_h = sticker_size_fixed
+    else:
+        max_w = max(p.width for p in params)
+        max_h = max(p.height for p in params)
+
+    surface_w = round(cols * max_w + (cols - 1) * gap_x + pad_l + pad_r)
+    surface_h = round(rows * max_h + (rows - 1) * gap_y + pad_t + pad_b)
 
     surface = skia.Surface(surface_w, surface_h)
 
     with surface as canvas:
-        canvas.drawColor(background_color)
+        if isinstance(background, skia.Image):
+            bw = background.width()
+            bh = background.height()
+            ratio, ox, oy = get_resize_cover_ratio_and_offset(
+                bw,
+                bh,
+                surface_w,
+                surface_h,
+            )
+            canvas.drawImageRect(
+                background,
+                skia.Rect.MakeXYWH(ox, oy, bw * ratio, bh * ratio),
+                skia.SamplingOptions(skia.FilterMode.kLinear),
+            )
+        else:
+            canvas.drawColor(background)
 
-    grid_y_offset = padding
+    grid_y_offset = pad_t
     for row in splitted_stickers:
-        grid_x_offset = padding
+        grid_x_offset = pad_l
         for param in row:
-            ratio, rw, rh = get_resize_ratio_and_size(
+            ratio, rw, rh = get_resize_contain_ratio_and_size(
                 param.width,
                 param.height,
                 max_w,
@@ -406,7 +452,7 @@ def draw_sticker_grid(
                 base_path,
                 param,
             )
-            grid_x_offset += max_w + gap
-        grid_y_offset += max_h + gap
+            grid_x_offset += max_w + gap_x
+        grid_y_offset += max_h + gap_y
 
     return surface
