@@ -714,3 +714,15 @@ def draw_sticker_pack_list(packs: dict[str, StickerPack]):
             )
 
     return surface
+
+
+def save_image(
+    surface: skia.Surface,
+    image_type: SkiaEncodedImageFormatType,
+    quality: int = 95,
+):
+    return (
+        surface.makeImageSnapshot()
+        .encodeToData(transform_image_type(image_type), quality)
+        .bytes()
+    )
