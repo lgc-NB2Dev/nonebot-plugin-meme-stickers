@@ -1,5 +1,3 @@
-# ruff: noqa: INP001
-
 import math
 from pathlib import Path
 from typing import Optional, Union
@@ -462,13 +460,18 @@ def draw_sticker_grid(
     pad_t, pad_r, pad_b, pad_l = padding
     gap_x, gap_y = gap
 
+    stickers_len = len(stickers)
     if rows:
-        cols = math.ceil(len(stickers) / rows)
-        splitted_stickers = chunks(stickers, cols)
+        if stickers_len < rows:
+            rows = stickers_len
+        cols = math.ceil(stickers_len / rows)
     else:
         assert cols
-        splitted_stickers = chunks(stickers, cols)
-        rows = math.ceil(len(stickers) / cols)
+        if stickers_len < cols:
+            cols = stickers_len
+        rows = math.ceil(stickers_len / cols)
+
+    splitted_stickers = chunks(stickers, cols)
 
     if sticker_size_fixed:
         max_w, max_h = sticker_size_fixed
@@ -666,7 +669,7 @@ def draw_sticker_pack_list(packs: dict[str, StickerPack]):
     surface_w = (
         DEFAULT_CARD_GRID_PADDING * 2
         + DEFAULT_CARD_GRID_GAP * (DEFAULT_CARD_GRID_COLS - 1)
-        + card_w * DEFAULT_CARD_GRID_COLS
+        + card_w * len(splitted_cards[0])
     )
     surface_h = (
         DEFAULT_CARD_GRID_PADDING * 2
