@@ -198,17 +198,29 @@ class StickerPackManifest(BaseModel):
     default_config: StickerPackConfig = StickerPackConfig()
     default_sticker_params: StickerParamsOptional = StickerParamsOptional()
     sticker_grid: StickerGridSetting = StickerGridSetting()
+    sample_sticker: Union[StickerInfoOptionalParams, str, int, None] = None
     external_fonts: list[StickerExternalFont] = []
     stickers: list[StickerInfoOptionalParams]
 
     _resolved_stickers: list[StickerInfo] = PrivateAttr([])
+    _resolved_sample_sticker: Optional[StickerParams] = PrivateAttr(None)
 
     @property
     def resolved_stickers(self) -> list[StickerInfo]:
         return self._resolved_stickers
 
+    @property
+    def resolved_sample_sticker(self) -> StickerParams:
+        return self._resolved_sample_sticker or self.resolved_stickers[0].params
+
     def resolve_sticker_params(self, *args: StickerParamsOptional) -> StickerParams:
         return merge_ensure_sticker_params(self.default_sticker_params, *args)
+
+    def find_sticker_by_name(self, name: str) -> Optional[StickerInfo]:
+        return next(
+            (x for x in self.resolved_stickers if x.name == name),
+            None,
+        )
 
     @field_validator("name")
     def validate_name(cls, value: str) -> str:  # noqa: N805
@@ -218,22 +230,42 @@ class StickerPackManifest(BaseModel):
 
     @model_validator(mode="after")
     def validate_resolve_stickers(self) -> Self:
+        def validate_info(sticker: StickerInfoOptionalParams) -> StickerInfo:
+            return type_validate_python(
+                StickerInfo,
+                {
+                    **type_dump_python(sticker, exclude={"params"}),
+                    "params": self.resolve_sticker_params(sticker.params),
+                },
+            )
+
         resolved_stickers: list[StickerInfo] = []
-        for idx, sticker in enumerate(self.stickers):
+        for idx, x in enumerate(self.stickers):
             try:
-                resolved_stickers.append(
-                    type_validate_python(
-                        StickerInfo,
-                        {
-                            **type_dump_python(sticker, exclude={"params"}),
-                            "params": self.resolve_sticker_params(sticker.params),
-                        },
-                    ),
-                )
+                resolved_stickers.append(validate_info(x))
             except ValidationError as e:
                 info = indent(str(e), "    ")
                 raise ValueError(f"Sticker {idx} validation failed\n{info}") from e
         self._resolved_stickers = resolved_stickers
+
+        if isinstance(self.sample_sticker, StickerInfoOptionalParams):
+            try:
+                self._resolved_sample_sticker = self.resolve_sticker_params(
+                    self.sample_sticker.params,
+                )
+            except ValidationError as e:
+                info = indent(str(e), "    ")
+                raise ValueError("Sample sticker validation failed\n{info}") from e
+        elif isinstance(self.sample_sticker, str):
+            resolved = self.find_sticker_by_name(self.sample_sticker)
+            if resolved is None:
+                raise ValueError("Sample sticker name not found")
+            self._resolved_sample_sticker = resolved.params
+        elif isinstance(self.sample_sticker, int):
+            self._resolved_sample_sticker = self.resolved_stickers[
+                self.sample_sticker
+            ].params
+
         return self
 
 
