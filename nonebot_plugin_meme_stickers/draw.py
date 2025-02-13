@@ -393,17 +393,8 @@ def transform_image_type(
     image_type: SkiaEncodedImageFormatType,
 ) -> skia.EncodedImageFormat:
     return {
-        "astc": skia.EncodedImageFormat.kASTC,
-        "bmp": skia.EncodedImageFormat.kBMP,
-        "dng": skia.EncodedImageFormat.kDNG,
-        "gif": skia.EncodedImageFormat.kGIF,
-        "heif": skia.EncodedImageFormat.kHEIF,
-        "ico": skia.EncodedImageFormat.kICO,
         "jpeg": skia.EncodedImageFormat.kJPEG,
-        "ktx": skia.EncodedImageFormat.kKTX,
-        "pkm": skia.EncodedImageFormat.kPKM,
         "png": skia.EncodedImageFormat.kPNG,
-        "wbmp": skia.EncodedImageFormat.kWBMP,
         "webp": skia.EncodedImageFormat.kWEBP,
     }[image_type]
 
