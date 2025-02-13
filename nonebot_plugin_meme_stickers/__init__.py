@@ -23,11 +23,14 @@ __plugin_meta__ = PluginMetadata(
     extra={"License": "MIT", "Author": "LgCookie"},
 )
 
-if config.meme_sticker_auto_update:
-    driver = get_driver()
+driver = get_driver()
 
-    @driver.on_startup
-    async def _():
+
+@driver.on_startup
+async def _():
+    pack_manager.reload(clear_updating_flags=True)
+
+    if config.meme_sticker_auto_update:
         await asyncio.create_task(
             pack_manager.update(force=config.meme_stickers_force_update),
         )

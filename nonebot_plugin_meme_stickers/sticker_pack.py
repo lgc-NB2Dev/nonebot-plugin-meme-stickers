@@ -2,7 +2,9 @@ import asyncio
 import hashlib
 import json
 import shutil
+from collections.abc import Iterable
 from contextlib import contextmanager
+from dataclasses import dataclass, field
 from functools import cached_property
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -11,7 +13,6 @@ from typing_extensions import Unpack
 
 from cookit import deep_merge
 from cookit.loguru import warning_suppress
-from cookit.loguru.common import logged_suppress
 from cookit.pyd import type_dump_python, type_validate_json
 from nonebot import logger
 
@@ -223,26 +224,28 @@ def dump_readable_model(obj: object, **type_dump_kw) -> str:
 
 
 async def update_sticker_pack(
-    info: HubStickerPackInfo,
+    pack_path: Path,
+    source: FileSource,
     manifest: Optional[StickerPackManifest] = None,
     **req_kw: Unpack[ReqKwargs],
 ) -> StickerPack:
-    base_path = config.meme_stickers_data_dir / info.slug
-    if (base_path / UPDATING_FLAG_FILENAME).exists():
-        raise RuntimeError(f"Pack `{info.slug}` is updating")
+    slug = pack_path.name
+
+    if (pack_path / UPDATING_FLAG_FILENAME).exists():
+        raise RuntimeError(f"Pack `{slug}` is updating")
 
     if "cli" not in req_kw:
         req_kw["cli"] = create_client()
 
     if manifest is None:
-        logger.debug(f"Fetching manifest of pack `{info.slug}`")
-        manifest = await fetch_manifest(info.source, **req_kw)
+        logger.debug(f"Fetching manifest of pack `{slug}`")
+        manifest = await fetch_manifest(source, **req_kw)
 
-    logger.debug(f"Fetching resource file checksums of pack `{info.slug}`")
-    checksum = await fetch_optional_checksum(info.source, **req_kw)
+    logger.debug(f"Fetching resource file checksums of pack `{slug}`")
+    checksum = await fetch_optional_checksum(source, **req_kw)
 
-    logger.debug(f"Collecting files need to update for pack `{info.slug}`")
-    local_files = collect_local_files(base_path) if base_path.exists() else []
+    logger.debug(f"Collecting files need to update for pack `{slug}`")
+    local_files = collect_local_files(pack_path) if pack_path.exists() else []
     remote_files = collect_manifest_files(manifest)
 
     # collect files should be downloaded
@@ -257,7 +260,7 @@ async def update_sticker_pack(
     file_both_exist = set(local_files) & set(remote_files)
     if checksum:
         both_exist_checksum = {
-            x: calc_checksum_from_file(base_path / x) for x in file_both_exist
+            x: calc_checksum_from_file(pack_path / x) for x in file_both_exist
         }
         files_should_download.update(
             x for x, c in both_exist_checksum.items() if checksum.get(x) != c
@@ -269,9 +272,9 @@ async def update_sticker_pack(
 
     @contextmanager
     def update_flag_file_ctx():
-        if not base_path.exists():
-            base_path.mkdir(parents=True, exist_ok=True)
-        flag_path = base_path / UPDATING_FLAG_FILENAME
+        if not pack_path.exists():
+            pack_path.mkdir(parents=True, exist_ok=True)
+        flag_path = pack_path / UPDATING_FLAG_FILENAME
         flag_path.touch()
         yield
         flag_path.unlink()
@@ -284,7 +287,7 @@ async def update_sticker_pack(
 
         async def download(path: str):
             nonlocal downloaded_count
-            r = await fetch_source(info.source, path, **req_kw)
+            r = await fetch_source(source, path, **req_kw)
             p = tmp_dir_path / path
             p.parent.mkdir(parents=True, exist_ok=True)
             p.write_bytes(r.content)
@@ -296,25 +299,25 @@ async def update_sticker_pack(
                 "INFO" if is_info else "DEBUG",
                 (
                     f"[{downloaded_count} / {download_total}] "
-                    f"Downloaded of pack `{info.slug}`: {path}"
+                    f"Downloaded of pack `{slug}`: {path}"
                 ),
             )
 
         await asyncio.gather(*(download(x) for x in files_should_download))
 
-        logger.info(f"Moving downloaded files to data dir of pack `{info.slug}`")
+        logger.info(f"Moving downloaded files to data dir of pack `{slug}`")
         for path in files_should_download:
             src_p = tmp_dir_path / path
-            dst_p = base_path / path
+            dst_p = pack_path / path
             dst_p.parent.mkdir(parents=True, exist_ok=True)
             shutil.move(src_p, dst_p)
 
     with update_flag_file_ctx():
         if not download_total:
-            logger.info(f"No files need to update for pack `{info.slug}`")
+            logger.info(f"No files need to update for pack `{slug}`")
         else:
             logger.info(
-                f"Pack `{info.slug}`"
+                f"Pack `{slug}`"
                 f" collected {download_total} files will update from remote,"
                 f" downloading to temp dir",
             )
@@ -326,63 +329,75 @@ async def update_sticker_pack(
         if files_should_remove:
             logger.info(
                 f"Removing {len(files_should_remove)} not needed files"
-                f" from pack `{info.slug}`",
+                f" from pack `{slug}`",
             )
             for path in files_should_remove:
-                (base_path / path).unlink()
+                (pack_path / path).unlink()
 
         # remove empty folders
         empty_folders = tuple(
-            p for p in base_path.rglob("*") if p.is_dir() and not any(p.iterdir())
+            p for p in pack_path.rglob("*") if p.is_dir() and not any(p.iterdir())
         )
         if empty_folders:
             logger.info(
-                f"Removing {len(empty_folders)} empty folders from pack `{info.slug}`",
+                f"Removing {len(empty_folders)} empty folders from pack `{slug}`",
             )
             for p in empty_folders:
                 p.rmdir()
 
-        logger.debug(f"Updating manifest and config of pack `{info.slug}`")
+        logger.debug(f"Updating manifest and config of pack `{slug}`")
         pack = StickerPack(
-            base_path=base_path,
+            base_path=pack_path,
             manifest_init=manifest,
         )
-        pack.config.update_source = info.source
+        pack.config.update_source = source
         pack.save_config()
 
     external_fonts_updated = {
         x.path for x in manifest.external_fonts if x.path in files_should_download
     }
     if external_fonts_updated:
-        logger.warning(f"Pack `{info.slug}` updated these external font(s):")
+        logger.warning(f"Pack `{slug}` updated these external font(s):")
         for x in external_fonts_updated:
-            logger.warning(f"  - {(base_path / x).resolve()}")
+            logger.warning(f"  - {(pack_path / x).resolve()}")
         logger.warning(
             "Don't forget to install them into system then restart bot to use!",
         )
         logger.warning(
-            f"贴纸包 `{info.slug}` 更新了如上额外字体文件，"
+            f"贴纸包 `{slug}` 更新了如上额外字体文件，"
             f"请不要忘记安装这些字体文件到系统中，然后重启 Bot 以正常使用本插件功能！",
         )
 
-    logger.info(f"Successfully updated pack `{info.slug}`")
+    logger.info(f"Successfully updated pack `{slug}`")
     return pack
+
+
+@dataclass
+class StickerPackOperationInfo:
+    succeed: list[str] = field(default_factory=list)
+    failed: list[tuple[str, Exception]] = field(default_factory=list)
+    skipped: list[str] = field(default_factory=list)
 
 
 class StickerPackManager:
     def __init__(
         self,
         base_path: Path,
-        init_clear_updating_flags: bool = False,
+        init_auto_load: bool = False,
+        init_load_clear_updating_flags: bool = False,
     ) -> None:
         self.base_path = base_path
+        self.packs: dict[str, StickerPack] = {}
+        if init_auto_load:
+            self.reload(init_load_clear_updating_flags)
+
+    def reload(self, clear_updating_flags: bool = False) -> StickerPackOperationInfo:
+        self.packs.clear()
+
         if not self.base_path.exists():
             self.base_path.mkdir(parents=True)
-        self.packs: dict[str, StickerPack] = {}
-        self.reload(init_clear_updating_flags)
 
-    def reload(self, clear_updating_flags: bool = False):
-        self.packs.clear()
+        opt_info = StickerPackOperationInfo()
         paths = (
             self.base_path / x
             for x in self.base_path.iterdir()
@@ -392,24 +407,37 @@ class StickerPackManager:
         for path in paths:
             if (path / UPDATING_FLAG_FILENAME).exists():
                 if not clear_updating_flags:
+                    opt_info.skipped.append(path.name)
                     logger.info(f"Pack `{path.name}` is updating, skip load")
                     continue
                 (path / UPDATING_FLAG_FILENAME).unlink()
                 logger.warning(f"Cleared updating flag of pack `{path.name}`")
 
-            with warning_suppress(f"Failed to load pack `{path.name}`"):
+            try:
                 self.packs[path.name] = StickerPack(path)
+            except Exception as e:
+                opt_info.failed.append((path.name, e))
+                with warning_suppress(f"Failed to load pack `{path.name}`"):
+                    raise
+            else:
+                opt_info.succeed.append(path.name)
                 logger.debug(f"Successfully loaded pack `{path.name}`")
 
         logger.success(f"Successfully loaded {len(self.packs)} packs")
+        return opt_info
 
-    async def update(self, force: bool = False):
+    async def update(
+        self,
+        packs: Optional[Iterable[str]] = None,
+        force: bool = False,
+    ) -> StickerPackOperationInfo:
         logger.info("Collecting sticker packs need to update")
         update_packs_info = [
             HubStickerPackInfo(slug=k, source=s)
             for k, v in self.packs.items()
             if (
-                (s := v.merged_config.update_source)
+                ((packs is None) or (k in packs))
+                and (s := v.merged_config.update_source)
                 and (not (v.base_path / UPDATING_FLAG_FILENAME).exists())
             )
         ]
@@ -420,38 +448,101 @@ class StickerPackManager:
             ),
         )
         packs_will_update: list[tuple[HubStickerPackInfo, StickerPackManifest]] = []
+        opt_info = StickerPackOperationInfo()
         for x, m in zip(update_packs_info, update_packs_manifest):
             local_v = self.packs[x.slug].manifest.version
             if m and (force or local_v < m.version):
                 packs_will_update.append((x, m))
             else:
+                opt_info.skipped.append(x.slug)
                 logger.debug(
                     f"Skip update sticker pack `{x.slug}`"
                     f" (local ver {local_v}, remote ver {m.version if m else 'Unknown'})",
                 )
 
+        if not packs_will_update:
+            logger.info("No sticker pack need to update")
+            return opt_info
+
         for x in packs_will_update:
             del self.packs[x[0].slug]
 
-        async def up(info: HubStickerPackInfo, manifest: StickerPackManifest) -> bool:
-            with logged_suppress(f"Update sticker pack `{info.slug}` failed"):
-                await update_sticker_pack(info, manifest, sem=global_req_sem)
-                return True
-            return False
+        async def up(info: HubStickerPackInfo, manifest: StickerPackManifest):
+            try:
+                await update_sticker_pack(
+                    self.base_path / info.slug,
+                    info.source,
+                    manifest,
+                    sem=global_req_sem,
+                )
+            except Exception as e:
+                opt_info.failed.append((info.slug, e))
+                with warning_suppress(f"Update sticker pack `{info.slug}` failed"):
+                    raise
+            else:
+                opt_info.succeed.append(info.slug)
 
         logger.info(
             f"Updating {len(packs_will_update)} sticker packs"
-            f" ({', '.join(x[0].slug for x in packs_will_update)})",
+            f": {', '.join(x[0].slug for x in packs_will_update)}",
         )
-        results = await asyncio.gather(*(up(*x) for x in packs_will_update))
-        true_count = sum(1 for x in results if x)
-        false_count = len(results) - true_count
-        logger.info(f"Update finished, {true_count} succeed, {false_count} failed")
-
+        await asyncio.gather(*(up(*x) for x in packs_will_update))
+        logger.info(
+            f"Update finished,"
+            f" {len(opt_info.succeed)} succeed, {len(opt_info.failed)} failed",
+        )
         self.reload()
 
+        return opt_info
 
-pack_manager = StickerPackManager(
-    config.meme_stickers_data_dir,
-    init_clear_updating_flags=True,
-)
+    async def install(
+        self,
+        packs: Iterable[str],
+        hub: Optional[HubManifest] = None,
+        manifests: Optional[dict[str, StickerPackManifest]] = None,
+    ) -> StickerPackOperationInfo:
+        opt_info = StickerPackOperationInfo()
+
+        if hub is None:
+            logger.info("Fetching hub manifest")
+            hub = await fetch_hub()
+
+        async def ins(slug: str):
+            if (self.base_path / slug).exists():
+                e_str = "Pack `{slug}` already exists"
+                logger.warning(e_str)
+                opt_info.failed.append((slug, RuntimeError(e_str)))
+                return
+
+            info = next((x for x in hub if x.slug == slug), None)
+            if info is None:
+                e_str = "Pack `{slug}` not found in hub"
+                logger.warning(e_str)
+                opt_info.failed.append((slug, RuntimeError(e_str)))
+                return
+
+            try:
+                await update_sticker_pack(
+                    self.base_path / slug,
+                    info.source,
+                    manifests[slug] if manifests else None,
+                    sem=global_req_sem,
+                )
+            except Exception as e:
+                opt_info.failed.append((slug, e))
+                with warning_suppress(f"Install sticker pack `{slug}` failed"):
+                    raise
+            else:
+                opt_info.succeed.append(slug)
+
+        logger.info(f"Installing sticker packs: {', '.join(packs)}")
+        await asyncio.gather(*(ins(x) for x in packs))
+        logger.info(
+            f"Install finished,"
+            f" {len(opt_info.succeed)} succeed, {len(opt_info.failed)} failed",
+        )
+        self.reload()
+        return opt_info
+
+
+pack_manager = StickerPackManager(config.meme_stickers_data_dir)

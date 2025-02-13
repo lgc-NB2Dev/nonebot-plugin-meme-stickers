@@ -86,7 +86,7 @@ alc = Alconna(
     ),
     Subcommand(
         "generate-interactive",
-        Args["slug#贴纸包代号", str],
+        Args["slug?#贴纸包代号", str],
         help_text="交互式生成贴纸",
     ),
     Subcommand(
@@ -98,12 +98,24 @@ alc = Alconna(
                 action=store_true,
                 help_text="显示 Hub 上的贴纸列表",
             ),
-            help_text="查看贴纸包列表",
+            help_text="查看本地或 Hub 上的贴纸包列表",
+        ),
+        Subcommand(
+            "reload",
+            help_text="重新加载本地贴纸包",
+        ),
+        Subcommand(
+            "install",
+            Args[
+                "slugs#要下载的贴纸包代号",
+                MultiVar(str, "*"),
+            ],
+            help_text="从 Hub 下载贴纸包",
         ),
         Subcommand(
             "update",
             Args[
-                "slugs#要下载或更新的贴纸包代号",
+                "slugs#要更新的贴纸包代号",
                 MultiVar(str, "*"),
             ],
             Option(
@@ -116,7 +128,7 @@ alc = Alconna(
                 action=store_true,
                 help_text="忽略本地版本，强制更新",
             ),
-            help_text="下载或从 Hub 更新贴纸包",
+            help_text="从 Hub 更新贴纸包",
         ),
         Subcommand(
             "delete",
@@ -153,6 +165,11 @@ async def _(m: AlconnaMatcher):
 
 
 @m_cls.assign("packs.list")
+async def _(m: AlconnaMatcher):
+    await m.finish("开发中")
+
+
+@m_cls.assign("packs.install")
 async def _(m: AlconnaMatcher):
     await m.finish("开发中")
 
