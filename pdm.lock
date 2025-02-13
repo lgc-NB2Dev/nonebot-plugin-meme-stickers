@@ -5,7 +5,7 @@
 groups = ["default"]
 strategy = ["inherit_metadata"]
 lock_version = "4.5.0"
-content_hash = "sha256:71bc958a63a51a7f2b395ed67038a75f2feecbbd5ebed0bbd768da5c551472f8"
+content_hash = "sha256:7dfecce1fb7abaef5b98c52ff6a431f12539066e00363e8655afb2cbae2e11f8"
 
 [[metadata.targets]]
 requires_python = "~=3.9"
@@ -97,7 +97,7 @@ files = [
 
 [[package]]
 name = "cookit"
-version = "0.9.3"
+version = "0.9.5"
 requires_python = "<4.0,>=3.9"
 summary = "A toolkit for self use."
 groups = ["default"]
@@ -105,25 +105,25 @@ dependencies = [
     "typing-extensions>=4.12.2",
 ]
 files = [
-    {file = "cookit-0.9.3-py3-none-any.whl", hash = "sha256:bcda202f9b6bbc7739ee613a5742b2189cb134d73e54dd61178881676b431dbf"},
-    {file = "cookit-0.9.3.tar.gz", hash = "sha256:68e6fce24bc7c0481b0aefb41e517b5c8744e371d87fe2a89c627c006a7b1ea8"},
+    {file = "cookit-0.9.5-py3-none-any.whl", hash = "sha256:ce33609451eb26a3b4175eee92c1eeeb60ed8ea63dc090bf90cfadac8313c814"},
+    {file = "cookit-0.9.5.tar.gz", hash = "sha256:380335b944e56268bc5cbeed13cc0411f0d6203f02060c9f1bc6f0481d425003"},
 ]
 
 [[package]]
 name = "cookit"
-version = "0.9.3"
+version = "0.9.5"
 extras = ["loguru", "pydantic"]
 requires_python = "<4.0,>=3.9"
 summary = "A toolkit for self use."
 groups = ["default"]
 dependencies = [
-    "cookit==0.9.3",
-    "loguru>=0.7.2",
+    "cookit==0.9.5",
+    "loguru>=0.7.3",
     "pydantic!=2.5.0,!=2.5.1,<3.0.0,>=1.10.0",
 ]
 files = [
-    {file = "cookit-0.9.3-py3-none-any.whl", hash = "sha256:bcda202f9b6bbc7739ee613a5742b2189cb134d73e54dd61178881676b431dbf"},
-    {file = "cookit-0.9.3.tar.gz", hash = "sha256:68e6fce24bc7c0481b0aefb41e517b5c8744e371d87fe2a89c627c006a7b1ea8"},
+    {file = "cookit-0.9.5-py3-none-any.whl", hash = "sha256:ce33609451eb26a3b4175eee92c1eeeb60ed8ea63dc090bf90cfadac8313c814"},
+    {file = "cookit-0.9.5.tar.gz", hash = "sha256:380335b944e56268bc5cbeed13cc0411f0d6203f02060c9f1bc6f0481d425003"},
 ]
 
 [[package]]
@@ -223,31 +223,6 @@ dependencies = [
 files = [
     {file = "loguru-0.7.3-py3-none-any.whl", hash = "sha256:31a33c10c8e1e10422bfd431aeb5d351c7cf7fa671e3c4df004162264b28220c"},
     {file = "loguru-0.7.3.tar.gz", hash = "sha256:19480589e77d47b8d85b2c827ad95d49bf31b0dcde16593892eb51dd18706eb6"},
-]
-
-[[package]]
-name = "markdown-it-py"
-version = "3.0.0"
-requires_python = ">=3.8"
-summary = "Python port of markdown-it. Markdown parsing, done right!"
-groups = ["default"]
-dependencies = [
-    "mdurl~=0.1",
-]
-files = [
-    {file = "markdown-it-py-3.0.0.tar.gz", hash = "sha256:e3f60a94fa066dc52ec76661e37c851cb232d92f9886b15cb560aaada2df8feb"},
-    {file = "markdown_it_py-3.0.0-py3-none-any.whl", hash = "sha256:355216845c60bd96232cd8d8c40e8f9765cc86f46880e43a8fd22dc1a1a8cab1"},
-]
-
-[[package]]
-name = "mdurl"
-version = "0.1.2"
-requires_python = ">=3.7"
-summary = "Markdown URL utilities"
-groups = ["default"]
-files = [
-    {file = "mdurl-0.1.2-py3-none-any.whl", hash = "sha256:84008a41e51615a49fc9966191ff91509e3c40b939176e643fd50a5c2196b8f8"},
-    {file = "mdurl-0.1.2.tar.gz", hash = "sha256:bb413d29f5eea38f31dd4754dd7377d4465116fb207585f97bf925588687c1ba"},
 ]
 
 [[package]]
@@ -356,7 +331,7 @@ files = [
 
 [[package]]
 name = "nonebot-plugin-alconna"
-version = "0.54.2"
+version = "0.55.1"
 requires_python = ">=3.9"
 summary = "Alconna Adapter for Nonebot"
 groups = ["default"]
@@ -370,8 +345,8 @@ dependencies = [
     "tarina<0.7,>=0.6.8",
 ]
 files = [
-    {file = "nonebot_plugin_alconna-0.54.2-py3-none-any.whl", hash = "sha256:ab9a1a5f0f8c9a30ba57a49bed5d3e9c3f761ea5954cbafb15bcd2aa9c7d5507"},
-    {file = "nonebot_plugin_alconna-0.54.2.tar.gz", hash = "sha256:0216da3bc2e5f8b4c4c44c2701f8f0a536d35ea0db79e708cc2ecd002b57ace6"},
+    {file = "nonebot_plugin_alconna-0.55.1-py3-none-any.whl", hash = "sha256:36162613b84d6196c33914e6d3efb6387423fa4acdb502a9104f456232c3b4c4"},
+    {file = "nonebot_plugin_alconna-0.55.1.tar.gz", hash = "sha256:fb8c9e1898918fc949f6294ebffbcd22699a1974b3bd486862c0f81a41dc0044"},
 ]
 
 [[package]]
@@ -682,17 +657,6 @@ files = [
 ]
 
 [[package]]
-name = "pygments"
-version = "2.19.1"
-requires_python = ">=3.8"
-summary = "Pygments is a syntax highlighting package written in Python."
-groups = ["default"]
-files = [
-    {file = "pygments-2.19.1-py3-none-any.whl", hash = "sha256:9ea1544ad55cecf4b8242fab6dd35a93bbce657034b0611ee383099054ab6d8c"},
-    {file = "pygments-2.19.1.tar.gz", hash = "sha256:61c16d2a8576dc0649d9f39e089b5f02bcd27fba10d8fb4dcc28173f7a45151f"},
-]
-
-[[package]]
 name = "pygtrie"
 version = "2.5.0"
 summary = "A pure Python trie data structure implementation."
@@ -714,24 +678,8 @@ files = [
 ]
 
 [[package]]
-name = "rich"
-version = "13.9.4"
-requires_python = ">=3.8.0"
-summary = "Render rich text, tables, progress bars, syntax highlighting, markdown and more to the terminal"
-groups = ["default"]
-dependencies = [
-    "markdown-it-py>=2.2.0",
-    "pygments<3.0.0,>=2.13.0",
-    "typing-extensions<5.0,>=4.0.0; python_version < \"3.11\"",
-]
-files = [
-    {file = "rich-13.9.4-py3-none-any.whl", hash = "sha256:6049d5e6ec054bf2779ab3358186963bac2ea89175919d699e378b99738c2a90"},
-    {file = "rich-13.9.4.tar.gz", hash = "sha256:439594978a49a09530cff7ebc4b5c7103ef57baf48d5ea3184f21d9a2befa098"},
-]
-
-[[package]]
 name = "skia-python"
-version = "132.0b11"
+version = "134.0b12"
 summary = "Skia python binding"
 groups = ["default"]
 dependencies = [
@@ -739,31 +687,31 @@ dependencies = [
     "pybind11>=2.6",
 ]
 files = [
-    {file = "skia_python-132.0b11-cp310-cp310-macosx_11_0_arm64.whl", hash = "sha256:586891745253b39d7fbb9a665748f5560acc1ac979a7b8feec81cb8e78d4920e"},
-    {file = "skia_python-132.0b11-cp310-cp310-macosx_11_0_x86_64.whl", hash = "sha256:44d2d523cdf613070320251ecc0575eeaa54378407ac77150038987368365828"},
-    {file = "skia_python-132.0b11-cp310-cp310-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:d1e7aebf65108d37c56025faef72dd2c9a7c77826f85e3a3fbe11262815c83d6"},
-    {file = "skia_python-132.0b11-cp310-cp310-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:c5a44ec0cb731d2e9484c9bc2d4bb13581b1ae215880a2bbb13a4d38fcf88a00"},
-    {file = "skia_python-132.0b11-cp310-cp310-win_amd64.whl", hash = "sha256:5c81a8cac6b9c713ed299b71fe61d973414aba63bdf7a613b8962a2f1da31bd9"},
-    {file = "skia_python-132.0b11-cp311-cp311-macosx_11_0_arm64.whl", hash = "sha256:95fc735b01609f1743e18449008f76fbdc33bf7dd7563aec7049b9f19e3a267c"},
-    {file = "skia_python-132.0b11-cp311-cp311-macosx_11_0_x86_64.whl", hash = "sha256:bd6d491e4baf7e157aeaf13f6963161a4a60c90835166c98a6bed667b0dbedfa"},
-    {file = "skia_python-132.0b11-cp311-cp311-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:6f058a6ef14a1ae07b912ca6d9538a8122951d8faf5d918540b39ea618e39bc5"},
-    {file = "skia_python-132.0b11-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:1495d709570fb247f4ac7321697fb1d6293f42149eca61e461070d2056c85228"},
-    {file = "skia_python-132.0b11-cp311-cp311-win_amd64.whl", hash = "sha256:e12385570d8ca99d1a30e6d73125d8832ac11517551b7066adfb04b6a02ae8df"},
-    {file = "skia_python-132.0b11-cp312-cp312-macosx_11_0_arm64.whl", hash = "sha256:e55f7ae17fa7082088cab26b09667496cedd0a882dbe87366d0192721edfd2eb"},
-    {file = "skia_python-132.0b11-cp312-cp312-macosx_11_0_x86_64.whl", hash = "sha256:3b6f54a0be6b8bb5520fa9de22fce035f8aff934ec4008ef5512a7cdc211f024"},
-    {file = "skia_python-132.0b11-cp312-cp312-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:cc9800bc297baa3b877626f1effd4eefd3a3b4f67ac9c542d6370937533eb4a6"},
-    {file = "skia_python-132.0b11-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:db1b9088739577d41e40375beac56b9db852b1ea55c4fabef3d34ad385138c15"},
-    {file = "skia_python-132.0b11-cp312-cp312-win_amd64.whl", hash = "sha256:fe8faf84a4f07a07ef3599339b8acdffb0aa3baed473828177ea668e765bf5e0"},
-    {file = "skia_python-132.0b11-cp313-cp313-macosx_11_0_arm64.whl", hash = "sha256:0039b43be09f5c8811e762068e0799f437ce154510f0040a1d2428df2a6808c2"},
-    {file = "skia_python-132.0b11-cp313-cp313-macosx_11_0_x86_64.whl", hash = "sha256:5dc3a89c28eae94792608768afb866526273ac78bd34af5d9c5defe096b13210"},
-    {file = "skia_python-132.0b11-cp313-cp313-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:054acd950dd05878f2ffbce51db28befe083c2a1e04887dbd566d6580a81d01e"},
-    {file = "skia_python-132.0b11-cp313-cp313-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:96912300d26180af2573298acfca9e270278e162c0de8d0480c4b3b9a86d8f95"},
-    {file = "skia_python-132.0b11-cp313-cp313-win_amd64.whl", hash = "sha256:caaac5ba9f1c26f5dfbf50873c9191f75289dbcea45ba946a2f626de1cd3a14b"},
-    {file = "skia_python-132.0b11-cp39-cp39-macosx_11_0_arm64.whl", hash = "sha256:b2f373f6c1baba9465e0a270d2f84646d31b040f03c987895b791756a7cae87a"},
-    {file = "skia_python-132.0b11-cp39-cp39-macosx_11_0_x86_64.whl", hash = "sha256:40d65b329369a7afdbc64eccf857a3ec9cb0b5e0dc1ff484c06b757522535ea6"},
-    {file = "skia_python-132.0b11-cp39-cp39-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:d1177d68e05a713ae44257c054c1a72d04f53b1833e264de7f053fe228914732"},
-    {file = "skia_python-132.0b11-cp39-cp39-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:ffd829cf2b7b85772e8d0a3c65d52abcd31b20b163f02c7701a908a1ee7a4304"},
-    {file = "skia_python-132.0b11-cp39-cp39-win_amd64.whl", hash = "sha256:cc922461845e4dfb31304e8c19e8cdc6b7ba735be7c63c94310be77d23396ddd"},
+    {file = "skia_python-134.0b12-cp310-cp310-macosx_11_0_arm64.whl", hash = "sha256:1f262b27e7c9173c5e712ae319e3905fcea0fd594cc8267f878464ae4e8c8b3f"},
+    {file = "skia_python-134.0b12-cp310-cp310-macosx_11_0_x86_64.whl", hash = "sha256:032fdde60af650369d4d194e46bf3c802a8a2b01fc43e04a2486006a63ed94b3"},
+    {file = "skia_python-134.0b12-cp310-cp310-manylinux_2_28_aarch64.whl", hash = "sha256:41559a9ecb6058c3352454d5d3500b4f9a21d56a5915d332d241a8784fca02eb"},
+    {file = "skia_python-134.0b12-cp310-cp310-manylinux_2_28_x86_64.whl", hash = "sha256:16ad546c33f8aa6fee52ccdc54942026dc373760be6a540723e1a4a185a60575"},
+    {file = "skia_python-134.0b12-cp310-cp310-win_amd64.whl", hash = "sha256:acff539cde78327b0205f212d68ecd40a52aae1df7112703723b8085e7bdd9c6"},
+    {file = "skia_python-134.0b12-cp311-cp311-macosx_11_0_arm64.whl", hash = "sha256:855279cd55bc9f14c87057524287c457cb22279e5f5f910c3bdd1276d82c9a41"},
+    {file = "skia_python-134.0b12-cp311-cp311-macosx_11_0_x86_64.whl", hash = "sha256:2b8529533e3b33338b93a1d181f96b1c4e8342ac145cb22197d131e3ed3a0234"},
+    {file = "skia_python-134.0b12-cp311-cp311-manylinux_2_28_aarch64.whl", hash = "sha256:f58120c3c6e94f9fcfcb27e1d84a98755c6c036d3930021da58476e80c3194ba"},
+    {file = "skia_python-134.0b12-cp311-cp311-manylinux_2_28_x86_64.whl", hash = "sha256:1059dbd7ce22600cb2928cdb27760bc06ace9b13aa70cac4f0922538480804f9"},
+    {file = "skia_python-134.0b12-cp311-cp311-win_amd64.whl", hash = "sha256:4e8c862c67e01c3f4b753d747a32f3fbb48c39d540f4319ad270251e886c4489"},
+    {file = "skia_python-134.0b12-cp312-cp312-macosx_11_0_arm64.whl", hash = "sha256:eb721ab8ea26e5ae5ccaf4a649a3f7730590ad5ddfe8f6b3ac8215c3e0ffda7a"},
+    {file = "skia_python-134.0b12-cp312-cp312-macosx_11_0_x86_64.whl", hash = "sha256:501d7c5979c445ad89cdbcef661a2d9c8238736ff5cda1dbf1d1742d30da5d8a"},
+    {file = "skia_python-134.0b12-cp312-cp312-manylinux_2_28_aarch64.whl", hash = "sha256:b7214c35de16fcd490fccc0b0fecb997acbc158605d6cbe1b85a8e3396dd7518"},
+    {file = "skia_python-134.0b12-cp312-cp312-manylinux_2_28_x86_64.whl", hash = "sha256:404898661cac2ea7a11a05dc6881ce228cc79e0ffd21f660ed35cebe26eb2c85"},
+    {file = "skia_python-134.0b12-cp312-cp312-win_amd64.whl", hash = "sha256:520155e14537449d4560e4624b7796abf3e8fd8f9bf5b6615b8a19510cce2b05"},
+    {file = "skia_python-134.0b12-cp313-cp313-macosx_11_0_arm64.whl", hash = "sha256:a572830fbebb8892fe4cfc8fe46bccc1c4484e299b609d997cdf20b8d90fd0d6"},
+    {file = "skia_python-134.0b12-cp313-cp313-macosx_11_0_x86_64.whl", hash = "sha256:de1e729013537703e3fbe34e57bd5b8ed7be2d801fb2edd87b3749bbf618ab61"},
+    {file = "skia_python-134.0b12-cp313-cp313-manylinux_2_28_aarch64.whl", hash = "sha256:9288f58f052eacb0972370b94d46a236793a423c67fc3656313a3519539b460a"},
+    {file = "skia_python-134.0b12-cp313-cp313-manylinux_2_28_x86_64.whl", hash = "sha256:b7a6bf4f3cd458159f7d9c69a9473e70ceba0622ab9eb44333119413fd599ed8"},
+    {file = "skia_python-134.0b12-cp313-cp313-win_amd64.whl", hash = "sha256:4a8bba2437d3a48b74af37b81b029b5792551603ae43c4628f48e0915c0125fd"},
+    {file = "skia_python-134.0b12-cp39-cp39-macosx_11_0_arm64.whl", hash = "sha256:7019a50657a3db39b7470d54d0e08f6249f5798cb5598bff2b562faa22cff200"},
+    {file = "skia_python-134.0b12-cp39-cp39-macosx_11_0_x86_64.whl", hash = "sha256:a5dfdc03bb6f1d1c524dd5c0c3134ad4e04f33b303a84a3ea54ac569127b28df"},
+    {file = "skia_python-134.0b12-cp39-cp39-manylinux_2_28_aarch64.whl", hash = "sha256:411d1e4f33b5015bac37d75fef0df3408b0944854906b2d23192a6cd705dde9c"},
+    {file = "skia_python-134.0b12-cp39-cp39-manylinux_2_28_x86_64.whl", hash = "sha256:be1b240d86e77fc7abf6fc3e6bd1e0098bc197c5891f1a96a67fbbd3afaefe24"},
+    {file = "skia_python-134.0b12-cp39-cp39-win_amd64.whl", hash = "sha256:294275b51b241ef4ddc2d5d263432821a75280a09b7a118dd34fbceec31fe84e"},
 ]
 
 [[package]]

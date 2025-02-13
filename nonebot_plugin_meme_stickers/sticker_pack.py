@@ -403,7 +403,7 @@ class StickerPackManager:
 
         logger.success(f"Successfully loaded {len(self.packs)} packs")
 
-    async def update(self):
+    async def update(self, force: bool = False):
         logger.info("Collecting sticker packs need to update")
         update_packs_info = [
             HubStickerPackInfo(slug=k, source=s)
@@ -422,7 +422,7 @@ class StickerPackManager:
         packs_will_update: list[tuple[HubStickerPackInfo, StickerPackManifest]] = []
         for x, m in zip(update_packs_info, update_packs_manifest):
             local_v = self.packs[x.slug].manifest.version
-            if m and local_v < m.version:
+            if m and (force or local_v < m.version):
                 packs_will_update.append((x, m))
             else:
                 logger.debug(
@@ -439,7 +439,10 @@ class StickerPackManager:
                 return True
             return False
 
-        logger.info(f"Updating {len(packs_will_update)} sticker packs")
+        logger.info(
+            f"Updating {len(packs_will_update)} sticker packs"
+            f" ({', '.join(x[0].slug for x in packs_will_update)})",
+        )
         results = await asyncio.gather(*(up(*x) for x in packs_will_update))
         true_count = sum(1 for x in results if x)
         false_count = len(results) - true_count

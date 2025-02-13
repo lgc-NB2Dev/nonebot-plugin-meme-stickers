@@ -6,7 +6,8 @@ authors = [{ name = "LgCookie", email = "lgc2333@126.com" }]
 dependencies = [
     "nonebot2>=2.4.1",
     "nonebot-plugin-alconna>=0.55.1",
-    "skia-python>=132.0b11",
+    "nonebot-plugin-waiter>=0.8.1",
+    "skia-python>=134.0b12",
     "cookit[loguru,pydantic]>=0.9.5",
     "httpx>=0.27.2",
     "tenacity>=9.0.0",

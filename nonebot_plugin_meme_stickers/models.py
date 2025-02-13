@@ -7,9 +7,12 @@ from cookit.pyd.compat import type_validate_python
 from pydantic import BaseModel, PrivateAttr, ValidationError
 
 SkiaTextAlignType: TypeAlias = Literal[
-    "center", "end", "justify", "left", "right", "start"  # noqa: COM812
-]
+    "center", "end", "justify", "left", "right", "start",
+]  # fmt: skip
 SkiaFontStyleType: TypeAlias = Literal["bold", "bold_italic", "italic", "normal"]
+SkiaEncodedImageFormatType: TypeAlias = Literal[
+    "astc", "bmp", "dng", "gif", "heif", "ico", "jpeg", "ktx", "pkm", "png", "wbmp", "webp",
+]  # fmt: skip
 RGBAColorTuple: TypeAlias = tuple[int, int, int, int]
 TRBLPaddingTuple: TypeAlias = tuple[float, float, float, float]
 StickerGridPaddingType: TypeAlias = Union[

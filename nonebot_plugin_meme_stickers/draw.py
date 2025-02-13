@@ -9,6 +9,7 @@ from cookit import chunks
 from cookit.pyd import model_copy
 
 from .models import (
+    SkiaEncodedImageFormatType,
     SkiaFontStyleType,
     SkiaTextAlignType,
     StickerGridParams,
@@ -336,6 +337,25 @@ def transform_font_style(font_style: SkiaFontStyleType) -> skia.FontStyle:
         "italic": skia.FontStyle.Italic,
         "normal": skia.FontStyle.Normal,
     }[font_style]()
+
+
+def transform_image_type(
+    image_type: SkiaEncodedImageFormatType,
+) -> skia.EncodedImageFormat:
+    return {
+        "astc": skia.EncodedImageFormat.kASTC,
+        "bmp": skia.EncodedImageFormat.kBMP,
+        "dng": skia.EncodedImageFormat.kDNG,
+        "gif": skia.EncodedImageFormat.kGIF,
+        "heif": skia.EncodedImageFormat.kHEIF,
+        "ico": skia.EncodedImageFormat.kICO,
+        "jpeg": skia.EncodedImageFormat.kJPEG,
+        "ktx": skia.EncodedImageFormat.kKTX,
+        "pkm": skia.EncodedImageFormat.kPKM,
+        "png": skia.EncodedImageFormat.kPNG,
+        "wbmp": skia.EncodedImageFormat.kWBMP,
+        "webp": skia.EncodedImageFormat.kWEBP,
+    }[image_type]
 
 
 def read_file_to_skia_image(path: Union[Path, str]) -> skia.Image:
