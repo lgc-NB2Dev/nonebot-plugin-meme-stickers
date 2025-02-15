@@ -462,13 +462,11 @@ def draw_sticker_grid(
 
     stickers_len = len(stickers)
     if rows:
-        if stickers_len < rows:
-            rows = stickers_len
+        rows = min(rows, stickers_len)
         cols = math.ceil(stickers_len / rows)
     else:
         assert cols
-        if stickers_len < cols:
-            cols = stickers_len
+        cols = min(cols, stickers_len)
         rows = math.ceil(stickers_len / cols)
 
     splitted_stickers = chunks(stickers, cols)
@@ -662,14 +660,15 @@ def draw_sticker_pack_list(packs: dict[str, StickerPack]):
         for slug, p in packs.items()
     ]
     splitted_cards = list(chunks(cards, DEFAULT_CARD_GRID_COLS))
+    first_line_items = len(splitted_cards[0])
 
     card_w = max(x[1] for x in cards)
     card_lines_h = [max(x[2] for x in row) for row in splitted_cards]
 
     surface_w = (
         DEFAULT_CARD_GRID_PADDING * 2
-        + DEFAULT_CARD_GRID_GAP * (DEFAULT_CARD_GRID_COLS - 1)
-        + card_w * len(splitted_cards[0])
+        + DEFAULT_CARD_GRID_GAP * (first_line_items - 1)
+        + card_w * first_line_items
     )
     surface_h = (
         DEFAULT_CARD_GRID_PADDING * 2
