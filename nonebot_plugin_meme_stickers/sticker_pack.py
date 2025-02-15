@@ -8,8 +8,8 @@ from dataclasses import dataclass, field
 from functools import cached_property
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from typing import Optional
-from typing_extensions import Unpack
+from typing import Any, Callable, Optional, TypeVar, Union
+from typing_extensions import TypeAlias, Unpack
 
 from cookit import deep_merge
 from cookit.loguru import warning_suppress
@@ -379,17 +379,35 @@ class StickerPackOperationInfo:
     skipped: list[str] = field(default_factory=list)
 
 
+ManagerReloadHook: TypeAlias = Callable[["StickerPackManager"], Any]
+TMH = TypeVar("TMH", bound=ManagerReloadHook)
+
+
 class StickerPackManager:
     def __init__(
         self,
         base_path: Path,
+        reload_hooks: Union[
+            ManagerReloadHook,
+            Iterable[ManagerReloadHook],
+            None,
+        ] = None,
         init_auto_load: bool = False,
         init_load_clear_updating_flags: bool = False,
     ) -> None:
         self.base_path = base_path
         self.packs: dict[str, StickerPack] = {}
+        self.reload_hooks: list[ManagerReloadHook] = (
+            []
+            if reload_hooks is None
+            else ([reload_hooks] if callable(reload_hooks) else list(reload_hooks))
+        )
         if init_auto_load:
             self.reload(init_load_clear_updating_flags)
+
+    def register_reload_hook(self, func: TMH) -> TMH:
+        self.reload_hooks.append(func)
+        return func
 
     def reload(self, clear_updating_flags: bool = False) -> StickerPackOperationInfo:
         self.packs.clear()

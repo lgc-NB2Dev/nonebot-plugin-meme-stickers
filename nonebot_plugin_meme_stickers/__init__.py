@@ -7,14 +7,14 @@ from nonebot.plugin import PluginMetadata, inherit_supported_adapters, require
 
 require("nonebot_plugin_alconna")
 
-from . import __main__ as __main__
+from .__main__ import DESCRIPTION, NAME
 from .config import ConfigModel, config
 from .sticker_pack import pack_manager
 
 __version__ = "0.1.0"
 __plugin_meta__ = PluginMetadata(
-    name="Meme Stickers",
-    description="一站式制作 PJSK 样式表情包",
+    name=NAME,
+    description=DESCRIPTION,
     usage="指令：meme-stickers",
     type="application",
     homepage="https://github.com/lgc-NB2Dev/nonebot-plugin-meme-stickers",

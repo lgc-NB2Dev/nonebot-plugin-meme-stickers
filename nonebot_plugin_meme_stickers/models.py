@@ -1,5 +1,5 @@
 from textwrap import indent
-from typing import Any, Literal, Optional, Union
+from typing import Any, Literal, Optional, TypeVar, Union
 from typing_extensions import Self, TypeAlias
 
 from cookit.pyd import field_validator, model_validator, type_dump_python
@@ -26,11 +26,19 @@ StickerGridGapType: TypeAlias = Union[
     tuple[float, float],  # (x, y)
 ]
 
+T = TypeVar("T")
+
 MANIFEST_FILENAME = "manifest.json"
 CHECKSUM_FILENAME = "checksum.json"
 HUB_MANIFEST_FILENAME = "manifest.json"
 CONFIG_FILENAME = "config.json"
 UPDATING_FLAG_FILENAME = ".updating"
+
+
+def validate_not_falsy(cls: BaseModel, value: T) -> T:  # noqa: ARG001
+    if not value:
+        raise ValueError("value cannot be empty")
+    return value
 
 
 class FileSourceGitHubBase(BaseModel):
@@ -101,6 +109,8 @@ class StickerInfoOptionalParams(BaseModel):
     name: str
     category: str
     params: StickerParamsOptional
+
+    _validate_not_falsy = field_validator("name", "category")(validate_not_falsy)
 
 
 class StickerInfo(BaseModel):
@@ -214,20 +224,23 @@ class StickerPackManifest(BaseModel):
     def resolve_sticker_params(self, *args: StickerParamsOptional) -> StickerParams:
         return merge_ensure_sticker_params(self.default_sticker_params, *args)
 
-    def find_sticker_by_name(self, name: str) -> Optional[StickerInfo]:
-        return next(
+    def find_sticker_by_name(self, name: str) -> StickerInfo:
+        if res := next(
             (x for x in self.resolved_stickers if x.name == name),
             None,
-        )
+        ):
+            return res
+        raise ValueError(f"Name `{name}` not found in sticker list")
 
-    @field_validator("name")
-    def validate_name(cls, value: str) -> str:  # noqa: N805
-        if not value:
-            raise ValueError("Name must not be empty")
-        return value
+    def find_sticker(self, query: Union[str, int]) -> StickerInfo:
+        if isinstance(query, str) and (not query.isdigit()):
+            return self.find_sticker_by_name(query)
+        return self.resolved_stickers[int(query)]
+
+    _validate_not_falsy = field_validator("name")(validate_not_falsy)
 
     @model_validator(mode="after")
-    def validate_resolve_stickers(self) -> Self:
+    def _validate_resolve_stickers(self) -> Self:
         def validate_info(sticker: StickerInfoOptionalParams) -> StickerInfo:
             return type_validate_python(
                 StickerInfo,
@@ -246,7 +259,9 @@ class StickerPackManifest(BaseModel):
                 raise ValueError(f"Sticker {idx} validation failed\n{info}") from e
         self._resolved_stickers = resolved_stickers
 
-        if isinstance(self.sample_sticker, StickerInfoOptionalParams):
+        if not self.sample_sticker:
+            self._resolved_sample_sticker = self.resolved_stickers[0].params
+        elif isinstance(self.sample_sticker, StickerInfoOptionalParams):
             try:
                 self._resolved_sample_sticker = self.resolve_sticker_params(
                     self.sample_sticker.params,
@@ -254,15 +269,10 @@ class StickerPackManifest(BaseModel):
             except ValidationError as e:
                 info = indent(str(e), "    ")
                 raise ValueError("Sample sticker validation failed\n{info}") from e
-        elif isinstance(self.sample_sticker, str):
-            resolved = self.find_sticker_by_name(self.sample_sticker)
-            if resolved is None:
-                raise ValueError("Sample sticker name not found")
-            self._resolved_sample_sticker = resolved.params
-        elif isinstance(self.sample_sticker, int):
-            self._resolved_sample_sticker = self.resolved_stickers[
-                self.sample_sticker
-            ].params
+        else:
+            self._resolved_sample_sticker = self.find_sticker(
+                self.sample_sticker,
+            ).params
 
         return self
 
