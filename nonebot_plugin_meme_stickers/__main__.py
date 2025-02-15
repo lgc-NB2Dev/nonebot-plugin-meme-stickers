@@ -164,25 +164,22 @@ m_cls = on_alconna(
 )
 
 
-m_generate = m_cls.dispatch("~generate")
-
-
-@m_generate.handle()
+@m_cls.assign("generate")
 async def _(
     m: AlconnaMatcher,
-    slug: Optional[str] = None,
-    sticker: Optional[str] = None,
-    text: Optional[str] = None,
-    x: Optional[float] = None,
-    y: Optional[float] = None,
-    align: Optional[str] = None,
-    rotate: Optional[float] = None,
-    color: Optional[str] = None,
-    stroke_color: Optional[str] = None,
-    stroke_width_factor: Optional[float] = None,
-    font_size: Optional[float] = None,
-    font_style: Optional[str] = None,
-    image_format: Optional[str] = None,
+    slug: Optional[str],
+    sticker: Optional[str],
+    text: Optional[str],
+    x: Optional[float],
+    y: Optional[float],
+    align: Optional[str],
+    rotate: Optional[float],
+    color: Optional[str],
+    stroke_color: Optional[str],
+    stroke_width_factor: Optional[float],
+    font_size: Optional[float],
+    font_style: Optional[str],
+    image_format: Optional[str],
     q_auto_resize: Query[Optional[bool]] = Query("~auto_resize.value", None),
     q_no_auto_resize: Query[Optional[bool]] = Query(
         "~no_auto_resize.value",
@@ -193,52 +190,33 @@ async def _(
     await m.send(str(locals()).replace(", ", ",\n"))
 
 
-m_packs_cls = m_cls.dispatch("~packs")
-
-m_packs_list_cls = m_packs_cls.dispatch("~list")
-
-
-@m_packs_list_cls.handle()
+@m_cls.assign("packs.list")
 async def _(m: AlconnaMatcher):
     await m.finish("开发中")
 
 
-m_packs_reload_cls = m_packs_cls.dispatch("~reload")
-
-
-@m_packs_reload_cls.handle()
+@m_cls.assign("packs.reload")
 async def _(m: AlconnaMatcher):
     await m.finish("开发中")
 
 
-m_packs_install_cls = m_packs_cls.dispatch("~install")
-
-
-@m_packs_install_cls.handle()
+@m_cls.assign("packs.install")
 async def _(m: AlconnaMatcher):
     await m.finish("开发中")
 
 
-m_packs_update_cls = m_packs_cls.dispatch("~update")
-
-
-@m_packs_update_cls.handle()
+@m_cls.assign("packs.update")
 async def _(m: AlconnaMatcher):
     await m.finish("开发中")
 
 
-m_packs_delete_cls = m_packs_cls.dispatch("~delete")
-
-
-@m_packs_delete_cls.handle()
+@m_cls.assign("packs.delete")
 async def _(m: AlconnaMatcher):
     await m.finish("开发中")
 
 
 # fallback help
-
-
-@m_packs_cls.handle()
+@m_cls.assign(path="packs")
 @m_cls.assign("$main")
 async def _(m: AlconnaMatcher):
     await m.finish(alc.get_help())
