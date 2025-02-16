@@ -12,17 +12,21 @@ def op_retry(log_message: str = "Operation failed", **kwargs):
             return
         logger.warning(
             f"{log_message}"
-            f" (attempt {x.attempt_number} / {config.meme_stickers_retry_times})"
+            f" (attempt {x.attempt_number} / {config.retry_times})"
             f": {type(e).__name__}: {e}",
         )
         logger.opt(exception=e).debug("Stacktrace")
 
     return retry(
         **{
-            "stop": stop_after_attempt(config.meme_stickers_retry_times),
+            "stop": stop_after_attempt(config.retry_times),
             "wait": wait_fixed(0.5),
             "before_sleep": retry_log,
             "reraise": True,
             **kwargs,
         },
     )
+
+
+def format_error(e: BaseException):
+    return f"{type(e).__name__}: {e}"

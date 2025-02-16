@@ -1,23 +1,29 @@
 from pathlib import Path
 from typing import Optional
 
+from cookit.pyd import get_alias_model
 from nonebot import get_plugin_config
-from pydantic import BaseModel
+from pydantic import Field
+
+BaseConfigModel = get_alias_model(lambda x: f"meme_stickers_{x}")
 
 
-class ConfigModel(BaseModel):
-    proxy: Optional[str] = None
+class ConfigModel(BaseConfigModel):
+    proxy: Optional[str] = Field(None, alias="proxy")
 
-    meme_stickers_data_dir: Path = Path("./data/meme_stickers")
+    data_dir: Path = Path("./data/meme_stickers")
 
-    meme_stickers_github_url_template: str = (
+    github_url_template: str = (
         "https://raw.githubusercontent.com/{owner}/{repo}/{ref_path}/{path}"
     )
-    meme_stickers_retry_times: int = 3
-    meme_stickers_req_concurrency: int = 8
+    retry_times: int = 3
+    req_concurrency: int = 8
 
     meme_sticker_auto_update: bool = True
-    meme_stickers_force_update: bool = False
+    force_update: bool = False
+
+    prompt_retries: int = 3
+    prompt_timeout: int = 30
 
 
 config: ConfigModel = get_plugin_config(ConfigModel)

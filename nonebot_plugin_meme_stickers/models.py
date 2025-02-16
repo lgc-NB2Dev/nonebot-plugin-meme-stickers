@@ -125,7 +125,9 @@ class StickerExternalFont(BaseModel):
 
 class StickerPackConfig(BaseModel):
     update_source: Optional[FileSource] = None
+    disabled: bool = False
     commands: list[str] = []
+    extend_commands: list[str] = []
 
 
 class StickerGridParams(BaseModel):

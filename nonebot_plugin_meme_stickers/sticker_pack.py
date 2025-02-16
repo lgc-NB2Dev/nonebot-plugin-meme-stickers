@@ -8,7 +8,7 @@ from dataclasses import dataclass, field
 from functools import cached_property
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from typing import Any, Callable, Optional, TypeVar, Union
+from typing import Any, Callable, Generic, NamedTuple, Optional, TypeVar, Union
 from typing_extensions import TypeAlias, Unpack
 
 from cookit import deep_merge
@@ -33,10 +33,13 @@ from .models import (
 from .source_fetch import (
     ReqKwargs,
     create_client,
+    create_req_sem,
     fetch_github_source,
     fetch_source,
-    global_req_sem,
 )
+
+T = TypeVar("T")
+T2 = TypeVar("T2")
 
 
 class StickerPack:
@@ -62,12 +65,30 @@ class StickerPack:
         self._cached_merged_config: Optional[StickerPackConfig] = None
 
     @cached_property
+    def slug(self) -> str:
+        return self.base_path.name
+
+    @cached_property
     def manifest_path(self):
         return self.base_path / MANIFEST_FILENAME
 
     @cached_property
     def config_path(self):
         return self.base_path / CONFIG_FILENAME
+
+    @cached_property
+    def hub_manifest_info(self) -> Optional[HubStickerPackInfo]:
+        if not (s := self.merged_config.update_source):
+            return None
+        return HubStickerPackInfo(slug=self.slug, source=s)
+
+    @property
+    def updating(self) -> bool:
+        return (self.base_path / UPDATING_FLAG_FILENAME).exists()
+
+    @property
+    def unavailable(self) -> bool:
+        return self.merged_config.disabled or self.updating
 
     def reload_manifest(self):
         self.manifest = type_validate_json(
@@ -101,6 +122,7 @@ class StickerPack:
                 **deep_merge(
                     type_dump_python(self.manifest.default_config, exclude_unset=True),
                     type_dump_python(self.config, exclude_unset=True),
+                    skip_merge_paths={"commands"},
                 ),
             )
         return self._cached_merged_config
@@ -170,7 +192,7 @@ async def fetch_hub_and_packs(
     **req_kw: Unpack[ReqKwargs],
 ) -> tuple[HubManifest, dict[str, StickerPackManifest]]:
     if "sem" not in req_kw:
-        req_kw["sem"] = global_req_sem
+        req_kw["sem"] = create_req_sem()
 
     hub = await fetch_hub(**req_kw)
 
@@ -281,7 +303,7 @@ async def update_sticker_pack(
 
     async def do_update(tmp_dir_path: Path):
         if "sem" not in req_kw:
-            req_kw["sem"] = global_req_sem
+            req_kw["sem"] = create_req_sem()
 
         downloaded_count = 0
 
@@ -372,11 +394,16 @@ async def update_sticker_pack(
     return pack
 
 
+class ValueWithReason(NamedTuple, Generic[T, T2]):
+    value: T
+    info: T2
+
+
 @dataclass
-class StickerPackOperationInfo:
-    succeed: list[str] = field(default_factory=list)
-    failed: list[tuple[str, Exception]] = field(default_factory=list)
-    skipped: list[str] = field(default_factory=list)
+class StickerPackOperationInfo(Generic[T]):
+    succeed: list[T] = field(default_factory=list)
+    failed: list[ValueWithReason[T, BaseException]] = field(default_factory=list)
+    skipped: list[ValueWithReason[T, str]] = field(default_factory=list)
 
 
 ManagerReloadHook: TypeAlias = Callable[["StickerPackManager"], Any]
@@ -396,7 +423,7 @@ class StickerPackManager:
         init_load_clear_updating_flags: bool = False,
     ) -> None:
         self.base_path = base_path
-        self.packs: dict[str, StickerPack] = {}
+        self.packs: list[StickerPack] = []
         self.reload_hooks: list[ManagerReloadHook] = (
             []
             if reload_hooks is None
@@ -405,17 +432,24 @@ class StickerPackManager:
         if init_auto_load:
             self.reload(init_load_clear_updating_flags)
 
+    @property
+    def available_packs(self) -> list[StickerPack]:
+        return [x for x in self.packs if not x.unavailable]
+
     def register_reload_hook(self, func: TMH) -> TMH:
         self.reload_hooks.append(func)
         return func
 
-    def reload(self, clear_updating_flags: bool = False) -> StickerPackOperationInfo:
+    def reload(self, clear_updating_flags: bool = False):
         self.packs.clear()
 
-        if not self.base_path.exists():
-            self.base_path.mkdir(parents=True)
+        opt_info = StickerPackOperationInfo[str]()
 
-        opt_info = StickerPackOperationInfo()
+        if not self.base_path.exists():
+            logger.info("Data dir not exist, skip load")
+            return opt_info
+            # self.base_path.mkdir(parents=True)
+
         paths = (
             self.base_path / x
             for x in self.base_path.iterdir()
@@ -425,16 +459,16 @@ class StickerPackManager:
         for path in paths:
             if (path / UPDATING_FLAG_FILENAME).exists():
                 if not clear_updating_flags:
-                    opt_info.skipped.append(path.name)
+                    opt_info.skipped.append(ValueWithReason(path.name, "更新中"))
                     logger.info(f"Pack `{path.name}` is updating, skip load")
                     continue
                 (path / UPDATING_FLAG_FILENAME).unlink()
                 logger.warning(f"Cleared updating flag of pack `{path.name}`")
 
             try:
-                self.packs[path.name] = StickerPack(path)
+                self.packs.append(StickerPack(path))
             except Exception as e:
-                opt_info.failed.append((path.name, e))
+                opt_info.failed.append(ValueWithReason(path.name, e))
                 with warning_suppress(f"Failed to load pack `{path.name}`"):
                     raise
             else:
@@ -444,67 +478,110 @@ class StickerPackManager:
         logger.success(f"Successfully loaded {len(self.packs)} packs")
         return opt_info
 
+    def find_pack_by_slug(
+        self,
+        slug: str,
+        include_unavailable: bool = False,
+    ) -> Optional[StickerPack]:
+        return next(
+            (
+                x
+                for x in (self.packs if include_unavailable else self.available_packs)
+                if x.slug == slug
+            ),
+            None,
+        )
+
+    def find_pack(
+        self,
+        query: str,
+        include_unavailable: bool = False,
+    ) -> Optional[StickerPack]:
+        query = query.lower()
+        return next(
+            (
+                x
+                for x in (self.packs if include_unavailable else self.available_packs)
+                if x.slug == query or x.manifest.name.lower() == query
+            ),
+            None,
+        )
+
     async def update(
         self,
         packs: Optional[Iterable[str]] = None,
         force: bool = False,
     ) -> StickerPackOperationInfo:
         logger.info("Collecting sticker packs need to update")
-        update_packs_info = [
-            HubStickerPackInfo(slug=k, source=s)
-            for k, v in self.packs.items()
+
+        sem = create_req_sem()
+
+        will_update = [
+            x
+            for x in self.packs
             if (
-                ((packs is None) or (k in packs))
-                and (s := v.merged_config.update_source)
-                and (not (v.base_path / UPDATING_FLAG_FILENAME).exists())
+                ((packs is None) or (x.slug in packs))
+                and x.merged_config.update_source
+                and (not x.updating)
             )
         ]
-        update_packs_manifest = await asyncio.gather(
-            *(
-                fetch_optional_manifest(x.source, sem=global_req_sem)
-                for x in update_packs_info
-            ),
+
+        async def fetch_manifest(p: StickerPack):
+            assert p.merged_config.update_source
+            return (
+                p.slug,
+                await fetch_optional_manifest(p.merged_config.update_source, sem=sem),
+            )
+
+        manifests = dict(
+            await asyncio.gather(*(fetch_manifest(x) for x in will_update)),
         )
-        packs_will_update: list[tuple[HubStickerPackInfo, StickerPackManifest]] = []
-        opt_info = StickerPackOperationInfo()
-        for x, m in zip(update_packs_info, update_packs_manifest):
-            local_v = self.packs[x.slug].manifest.version
-            if m and (force or local_v < m.version):
-                packs_will_update.append((x, m))
-            else:
-                opt_info.skipped.append(x.slug)
+
+        opt_info = StickerPackOperationInfo[str]()
+
+        for p in will_update.copy():
+            local_v = p.manifest.version
+            if (not (m := manifests[p.slug])) or (
+                (not force) and (m.version <= local_v)
+            ):
+                will_update.remove(p)
+                opt_info.skipped.append(
+                    ValueWithReason(p.slug, "无须更新" if m else "获取贴纸包信息失败"),
+                )
                 logger.debug(
-                    f"Skip update sticker pack `{x.slug}`"
+                    f"Skip update sticker pack `{p.slug}`"
                     f" (local ver {local_v}, remote ver {m.version if m else 'Unknown'})",
                 )
 
-        if not packs_will_update:
+        if not will_update:
             logger.info("No sticker pack need to update")
             return opt_info
 
-        for x in packs_will_update:
-            del self.packs[x[0].slug]
+        # for p in will_update:
+        #     self.packs.remove(p)
 
-        async def up(info: HubStickerPackInfo, manifest: StickerPackManifest):
+        async def up(p: StickerPack):
+            assert p.merged_config.update_source
+
             try:
                 await update_sticker_pack(
-                    self.base_path / info.slug,
-                    info.source,
-                    manifest,
-                    sem=global_req_sem,
+                    self.base_path / p.slug,
+                    p.merged_config.update_source,
+                    manifests[p.slug],
+                    sem=sem,
                 )
             except Exception as e:
-                opt_info.failed.append((info.slug, e))
-                with warning_suppress(f"Update sticker pack `{info.slug}` failed"):
+                opt_info.failed.append(ValueWithReason(p.slug, e))
+                with warning_suppress(f"Update sticker pack `{p.slug}` failed"):
                     raise
             else:
-                opt_info.succeed.append(info.slug)
+                opt_info.succeed.append(p.slug)
 
         logger.info(
-            f"Updating {len(packs_will_update)} sticker packs"
-            f": {', '.join(x[0].slug for x in packs_will_update)}",
+            f"Updating {len(will_update)} sticker packs"
+            f": {', '.join(x.slug for x in will_update)}",
         )
-        await asyncio.gather(*(up(*x) for x in packs_will_update))
+        await asyncio.gather(*(up(x) for x in will_update))
         logger.info(
             f"Update finished,"
             f" {len(opt_info.succeed)} succeed, {len(opt_info.failed)} failed",
@@ -519,24 +596,28 @@ class StickerPackManager:
         hub: Optional[HubManifest] = None,
         manifests: Optional[dict[str, StickerPackManifest]] = None,
     ) -> StickerPackOperationInfo:
-        opt_info = StickerPackOperationInfo()
+        opt_info = StickerPackOperationInfo[str]()
 
         if hub is None:
             logger.info("Fetching hub manifest")
             hub = await fetch_hub()
 
+        sem = create_req_sem()
+
         async def ins(slug: str):
             if (self.base_path / slug).exists():
-                e_str = "Pack `{slug}` already exists"
-                logger.warning(e_str)
-                opt_info.failed.append((slug, RuntimeError(e_str)))
+                logger.warning("Pack `{slug}` already exists")
+                opt_info.failed.append(
+                    ValueWithReason(slug, RuntimeError("贴纸包已存在")),
+                )
                 return
 
             info = next((x for x in hub if x.slug == slug), None)
             if info is None:
-                e_str = "Pack `{slug}` not found in hub"
-                logger.warning(e_str)
-                opt_info.failed.append((slug, RuntimeError(e_str)))
+                logger.warning("Pack `{slug}` not found in hub")
+                opt_info.failed.append(
+                    ValueWithReason(slug, RuntimeError("未在 Hub 中找到对应贴纸包")),
+                )
                 return
 
             try:
@@ -544,10 +625,10 @@ class StickerPackManager:
                     self.base_path / slug,
                     info.source,
                     manifests[slug] if manifests else None,
-                    sem=global_req_sem,
+                    sem=sem,
                 )
             except Exception as e:
-                opt_info.failed.append((slug, e))
+                opt_info.failed.append(ValueWithReason(slug, e))
                 with warning_suppress(f"Install sticker pack `{slug}` failed"):
                     raise
             else:
@@ -562,5 +643,17 @@ class StickerPackManager:
         self.reload()
         return opt_info
 
+    def delete(self, pack: StickerPack):
+        self.packs.remove(pack)
+        shutil.rmtree(
+            pack.base_path,
+            ignore_errors=True,
+            onerror=lambda _, f, e: logger.warning(
+                f"Failed to delete `{f}`: {type(e).__name__}: {e}",
+            ),
+        )
+        logger.info(f"Deleted pack `{pack.slug}`")
+        self.reload()
 
-pack_manager = StickerPackManager(config.meme_stickers_data_dir)
+
+pack_manager = StickerPackManager(config.data_dir)

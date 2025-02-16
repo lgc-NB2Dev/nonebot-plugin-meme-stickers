@@ -49,17 +49,21 @@ def create_client(**kwargs):
     )
 
 
-global_req_sem = asyncio.Semaphore(config.meme_stickers_req_concurrency)
 source_fetcher = TypeDecoCollector[FileSource, SourceFetcher[Any]]()
+
+
+def create_req_sem():
+    return asyncio.Semaphore(config.req_concurrency)
 
 
 @source_fetcher(FileSourceURL)
 async def fetch_url_source(
     source: FileSourceURL,
     *paths: str,
-    cli: Optional[AsyncClient] = None,
-    sem: Optional[asyncio.Semaphore] = None,
+    **req_kw: Unpack[ReqKwargs],
 ) -> "Response":
+    cli = req_kw.get("cli")
+    sem = req_kw.get("sem")
     url = str(URL(source.url).joinpath(*paths))
 
     @op_retry(f"Fetch {url} failed")
@@ -67,7 +71,7 @@ async def fetch_url_source(
         return (await cli.get(url)).raise_for_status()
 
     ctx = create_client() if cli is None else nullcontext(cli)
-    sem = global_req_sem if sem is None else sem
+    sem = sem or nullcontext()
     async with sem, ctx as ctx_cli:
         return await fetch(ctx_cli)
 
@@ -86,7 +90,7 @@ def format_github_url(source: FileSourceGitHub):
         ),
         "path": source.path,
     }
-    return config.meme_stickers_github_url_template.format_map(v)
+    return config.github_url_template.format_map(v)
 
 
 @source_fetcher(FileSourceGitHubTag)
