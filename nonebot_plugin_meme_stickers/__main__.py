@@ -10,11 +10,7 @@ from arclet.alconna import (
     Subcommand,
     store_true,
 )
-from nonebot_plugin_alconna import (
-    AlconnaMatcher,
-    Query,
-    on_alconna,
-)
+from nonebot_plugin_alconna import AlconnaMatcher, Query, on_alconna
 
 NAME = "Meme Stickers"
 DESCRIPTION = "一站式制作 PJSK 样式表情包"
@@ -23,54 +19,54 @@ alc = Alconna(
     "meme-stickers",
     Subcommand(
         "generate",
-        Args(
-            Arg("slug#贴纸包代号", Optional[str]),
-            Arg("sticker#贴纸 ID", Optional[str]),
-            Arg("text#贴纸文本", Optional[str]),
+        Args(  # not using Optional to avoid subcommand match
+            Arg("slug?#贴纸包代号", str),
+            Arg("sticker?#贴纸 ID", str),
+            Arg("text?#贴纸文本", str),
         ),
         Option(
             "-x|--x",
-            Args["x", Optional[float]],
+            Args["x", float],
             help_text="文本基线 X 坐标",
         ),
         Option(
             "-y|--y",
-            Args["y", Optional[float]],
+            Args["y", float],
             help_text="文本基线 Y 坐标",
         ),
         Option(
             "--align",
-            Args["align", Optional[str]],
+            Args["align", str],
             help_text="文本对齐方式",
         ),
         Option(
             "--rotate",
-            Args["rotate", Optional[float]],
+            Args["rotate", float],
             help_text="文本旋转角度",
         ),
         Option(
             "--color",
-            Args["color", Optional[str]],
+            Args["color", str],
             help_text="文本颜色",
         ),
         Option(
             "--stroke-color",
-            Args["stroke_color", Optional[str]],
+            Args["stroke_color", str],
             help_text="文本描边颜色",
         ),
         Option(
             "--stroke-width-factor",
-            Args["stroke_width_factor", Optional[float]],
+            Args["stroke_width_factor", float],
             help_text="文本描边宽度系数",
         ),
         Option(
             "--font-size",
-            Args["font_size", Optional[float]],
+            Args["font_size", float],
             help_text="文本字号",
         ),
         Option(
             "--font-style",
-            Args["font_style", Optional[str]],
+            Args["font_style", str],
             help_text="文本字体风格",
         ),
         Option(
@@ -85,7 +81,7 @@ alc = Alconna(
         ),
         Option(
             "--image-format",
-            Args["image_format", Optional[str]],
+            Args["image_format", str],
             help_text="输出文件类型",
         ),
         Option(
@@ -164,59 +160,61 @@ m_cls = on_alconna(
 )
 
 
-@m_cls.assign("generate")
+@m_cls.dispatch("~generate").handle()
 async def _(
     m: AlconnaMatcher,
-    slug: Optional[str],
-    sticker: Optional[str],
-    text: Optional[str],
-    x: Optional[float],
-    y: Optional[float],
-    align: Optional[str],
-    rotate: Optional[float],
-    color: Optional[str],
-    stroke_color: Optional[str],
-    stroke_width_factor: Optional[float],
-    font_size: Optional[float],
-    font_style: Optional[str],
-    image_format: Optional[str],
+    # args
+    q_slug: Query[Optional[str]] = Query("~slug", None),
+    q_sticker: Query[Optional[str]] = Query("~sticker", None),
+    q_text: Query[Optional[str]] = Query("~text", None),
+    # opts with args
+    q_x: Query[Optional[float]] = Query("~x", None),
+    q_y: Query[Optional[float]] = Query("~y", None),
+    q_align: Query[Optional[str]] = Query("~align", None),
+    q_rotate: Query[Optional[float]] = Query("~rotate", None),
+    q_color: Query[Optional[str]] = Query("~color", None),
+    q_stroke_color: Query[Optional[str]] = Query("~stroke_color", None),
+    q_stroke_width_factor: Query[Optional[float]] = Query("~stroke_width_factor", None),
+    q_font_size: Query[Optional[float]] = Query("~font_size", None),
+    q_font_style: Query[Optional[str]] = Query("~font_style", None),
+    q_image_format: Query[Optional[str]] = Query("~image_format", None),
+    # opts without args
     q_auto_resize: Query[Optional[bool]] = Query("~auto_resize.value", None),
-    q_no_auto_resize: Query[Optional[bool]] = Query(
-        "~no_auto_resize.value",
-        default=False,
-    ),
+    q_no_auto_resize: Query[Optional[bool]] = Query("~no_auto_resize.value", None),
     q_debug: Query[bool] = Query("~debug.value", default=False),
 ):
     await m.send(str(locals()).replace(", ", ",\n"))
 
 
-@m_cls.assign("packs.list")
+m_packs_cls = m_cls.dispatch("~packs")
+
+
+@m_packs_cls.dispatch("~list").handle()
 async def _(m: AlconnaMatcher):
     await m.finish("开发中")
 
 
-@m_cls.assign("packs.reload")
+@m_packs_cls.dispatch("~reload").handle()
 async def _(m: AlconnaMatcher):
     await m.finish("开发中")
 
 
-@m_cls.assign("packs.install")
+@m_packs_cls.dispatch("~install").handle()
 async def _(m: AlconnaMatcher):
     await m.finish("开发中")
 
 
-@m_cls.assign("packs.update")
+@m_packs_cls.dispatch("~update").handle()
 async def _(m: AlconnaMatcher):
     await m.finish("开发中")
 
 
-@m_cls.assign("packs.delete")
+@m_packs_cls.dispatch("~update").handle()
 async def _(m: AlconnaMatcher):
     await m.finish("开发中")
 
 
 # fallback help
-@m_cls.assign(path="packs")
 @m_cls.assign("$main")
 async def _(m: AlconnaMatcher):
     await m.finish(alc.get_help())
