@@ -1,10 +1,19 @@
+import re
+from contextlib import contextmanager, suppress
 from textwrap import indent
-from typing import Any, Literal, Optional, TypeVar, Union
+from typing import Any, Literal, Optional, TypeVar, Union, cast
 from typing_extensions import Self, TypeAlias
 
-from cookit.pyd import field_validator, model_validator, type_dump_python
-from cookit.pyd.compat import type_validate_python
+from cookit import deep_merge
+from cookit.pyd import (
+    field_validator,
+    model_validator,
+    type_dump_python,
+    type_validate_python,
+)
 from pydantic import BaseModel, PrivateAttr, ValidationError
+
+T = TypeVar("T")
 
 SkiaTextAlignType: TypeAlias = Literal[
     "center", "end", "justify", "left", "right", "start",
@@ -26,19 +35,30 @@ StickerGridGapType: TypeAlias = Union[
     tuple[float, float],  # (x, y)
 ]
 
-T = TypeVar("T")
-
 MANIFEST_FILENAME = "manifest.json"
 CHECKSUM_FILENAME = "checksum.json"
 HUB_MANIFEST_FILENAME = "manifest.json"
 CONFIG_FILENAME = "config.json"
 UPDATING_FLAG_FILENAME = ".updating"
 
+SHORT_HEX_COLOR_REGEX = re.compile(r"#?(?P<hex>[0-9a-fA-F]{3,4})")
+FULL_HEX_COLOR_REGEX = re.compile(r"#?(?P<hex>([0-9a-fA-F]{3,4}){2})")
+FLOAT_REGEX = re.compile(r"\d+(\.\d+)?")
+
 
 def validate_not_falsy(cls: BaseModel, value: T) -> T:  # noqa: ARG001
     if not value:
         raise ValueError("value cannot be empty")
     return value
+
+
+@contextmanager
+def wrap_validation_error(msg: str):
+    try:
+        yield
+    except ValidationError as e:
+        info = indent(str(e), "    ")
+        raise ValueError(f"{msg}\n{info}") from e
 
 
 class FileSourceGitHubBase(BaseModel):
@@ -167,30 +187,44 @@ class StickerGridParams(BaseModel):
 class StickerGridSetting(BaseModel):
     disable_category_select: bool = False
     default_params: StickerGridParams = StickerGridParams()
-    override_params: dict[str, dict[str, Any]] = {}
+    category_override_params: StickerGridParams = StickerGridParams()
+    stickers_override_params: dict[str, StickerGridParams] = {}
 
-    _resolved_overrides: dict[str, StickerGridParams] = PrivateAttr({})
+    _resolved_category_params: StickerGridParams = PrivateAttr(StickerGridParams())
+    _resolved_stickers_params: dict[str, StickerGridParams] = PrivateAttr({})
 
     @property
-    def resolved_overrides(self) -> dict[str, StickerGridParams]:
-        return self._resolved_overrides
+    def resolved_category_params(self) -> StickerGridParams:
+        return self._resolved_category_params
+
+    @property
+    def resolved_stickers_params(self) -> dict[str, StickerGridParams]:
+        return self._resolved_stickers_params
 
     @model_validator(mode="after")
     def validate_resolve_overrides(self) -> Self:
-        for category, params in self.override_params.items():
-            try:
-                self._resolved_overrides[category] = type_validate_python(
+        with wrap_validation_error("category_select_override_params validation failed"):
+            self._resolved_category_params = type_validate_python(
+                StickerGridParams,
+                deep_merge(
+                    type_dump_python(self.default_params, exclude_unset=True),
+                    type_dump_python(
+                        self.category_override_params,
+                        exclude_unset=True,
+                    ),
+                ),
+            )
+        for category, params in self.stickers_override_params.items():
+            with wrap_validation_error(
+                f"category {category} overridden StickerGridSetting validation failed",
+            ):
+                self._resolved_stickers_params[category] = type_validate_python(
                     StickerGridParams,
-                    {
-                        **type_dump_python(self.default_params, exclude_unset=True),
-                        **params,
-                    },
+                    deep_merge(
+                        type_dump_python(self.default_params, exclude_unset=True),
+                        type_dump_python(params, exclude_unset=True),
+                    ),
                 )
-            except ValidationError as e:
-                info = indent(str(e), "    ")
-                raise ValueError(
-                    f"StickerGridSetting {category} validation failed\n{info}",
-                ) from e
         return self
 
 
@@ -223,21 +257,29 @@ class StickerPackManifest(BaseModel):
     def resolved_sample_sticker(self) -> StickerParams:
         return self._resolved_sample_sticker or self.resolved_stickers[0].params
 
+    @property
+    def resolved_stickers_by_category(self) -> dict[str, list[StickerInfo]]:
+        categories = list({x.category for x in self.resolved_stickers})
+        return {
+            c: [x for x in self.resolved_stickers if x.category == c]
+            for c in categories
+        }
+
     def resolve_sticker_params(self, *args: StickerParamsOptional) -> StickerParams:
         return merge_ensure_sticker_params(self.default_sticker_params, *args)
 
-    def find_sticker_by_name(self, name: str) -> StickerInfo:
-        if res := next(
+    def find_sticker_by_name(self, name: str) -> Optional[StickerInfo]:
+        return next(
             (x for x in self.resolved_stickers if x.name == name),
             None,
-        ):
-            return res
-        raise ValueError(f"Name `{name}` not found in sticker list")
+        )
 
-    def find_sticker(self, query: Union[str, int]) -> StickerInfo:
+    def find_sticker(self, query: Union[str, int]) -> Optional[StickerInfo]:
         if isinstance(query, str) and (not query.isdigit()):
             return self.find_sticker_by_name(query)
-        return self.resolved_stickers[int(query)]
+        with suppress(IndexError):
+            return self.resolved_stickers[int(query)]
+        return None
 
     _validate_not_falsy = field_validator("name")(validate_not_falsy)
 
@@ -254,27 +296,22 @@ class StickerPackManifest(BaseModel):
 
         resolved_stickers: list[StickerInfo] = []
         for idx, x in enumerate(self.stickers):
-            try:
+            with wrap_validation_error(f"Sticker {idx} validation failed"):
                 resolved_stickers.append(validate_info(x))
-            except ValidationError as e:
-                info = indent(str(e), "    ")
-                raise ValueError(f"Sticker {idx} validation failed\n{info}") from e
         self._resolved_stickers = resolved_stickers
 
         if not self.sample_sticker:
             self._resolved_sample_sticker = self.resolved_stickers[0].params
         elif isinstance(self.sample_sticker, StickerInfoOptionalParams):
-            try:
+            with wrap_validation_error("Sample sticker validation failed"):
                 self._resolved_sample_sticker = self.resolve_sticker_params(
                     self.sample_sticker.params,
                 )
-            except ValidationError as e:
-                info = indent(str(e), "    ")
-                raise ValueError("Sample sticker validation failed\n{info}") from e
         else:
-            self._resolved_sample_sticker = self.find_sticker(
-                self.sample_sticker,
-            ).params
+            it = self.find_sticker(self.sample_sticker)
+            if it is None:
+                raise ValueError(f"Sample sticker `{self.sample_sticker}` not found")
+            self._resolved_sample_sticker = it.params
 
         return self
 
@@ -296,3 +333,43 @@ class HubStickerPackInfo(BaseModel):
 
 
 HubManifest: TypeAlias = list[HubStickerPackInfo]
+
+
+def resolve_color_to_tuple(color: str) -> RGBAColorTuple:
+    sm: Optional[re.Match[str]] = None
+    fm: Optional[re.Match[str]] = None
+    if (sm := SHORT_HEX_COLOR_REGEX.fullmatch(color)) or (
+        fm := FULL_HEX_COLOR_REGEX.fullmatch(color)
+    ):
+        hex_str = (sm or cast(re.Match, fm))["hex"].upper()
+        if sm:
+            hex_str = "".join([x * 2 for x in hex_str])
+        hex_str = f"{hex_str}FF" if len(hex_str) == 6 else hex_str
+        return tuple(int(hex_str[i : i + 2], 16) for i in range(0, 8, 2))  # type: ignore
+
+    if (
+        (parts := color.lstrip("(").rstrip(")").split(",，"))
+        and (3 <= len(parts) <= 4)
+        # -
+        and (parts := [part.strip() for part in parts])
+        and all(x.isdigit() for x in parts[:3])
+        # -
+        and (rgb := [int(x) for x in parts[:3]])
+        and all(0 <= int(x) <= 255 for x in rgb)
+        # -
+        and (
+            (len(parts) == 3 and (a := 255))
+            or (parts[3].isdigit() and 0 <= (a := int(parts[3])) <= 255)
+            or (
+                FLOAT_REGEX.fullmatch(parts[3])
+                and 0 <= (a := int(float(parts[3]) * 255)) <= 255
+            )
+        )
+    ):
+        return (*rgb, a)  # type: ignore
+
+    raise ValueError(
+        f"Invalid color format: {color}."
+        f" supported formats: #RGB, #RRGGBB"
+        f", (R, G, B), (R, G, B, A), (R, G, B, a (0 ~ 1 float))",
+    )

@@ -1,5 +1,6 @@
+from collections.abc import Sequence
 from contextlib import asynccontextmanager
-from typing import Any, Callable, NoReturn, Optional, Union
+from typing import Any, Callable, NoReturn, Optional, TypeVar, Union
 from typing_extensions import TypeAlias
 
 import skia
@@ -14,6 +15,7 @@ from arclet.alconna import (
     store_true,
 )
 from cookit import TypeDecoCollector
+from cookit.pyd import model_copy
 from nonebot import logger
 from nonebot.adapters import Message as BaseMessage
 from nonebot.exception import NoneBotException
@@ -23,11 +25,18 @@ from nonebot_plugin_waiter import prompt
 
 from .config import config
 from .draw import (
+    FONT_STYLE_FUNC_MAP,
+    IMAGE_FORMAT_MAP,
+    TEXT_ALIGN_MAP,
+    draw_sticker_grid_from_params,
     draw_sticker_pack_grid,
     draw_sticker_pack_grid_from_packs,
+    make_sticker_picture_from_params,
+    make_surface_for_picture,
     save_image,
     temp_sticker_card_params,
 )
+from .models import StickerInfo, StickerParams, resolve_color_to_tuple
 from .sticker_pack import (
     StickerPack,
     StickerPackOperationInfo,
@@ -40,6 +49,9 @@ from .utils import format_error
 NAME = "Meme Stickers"
 DESCRIPTION = "一站式制作 PJSK 样式表情包"
 
+RELATIVE_INT_PARAM = r"re:\^?(\+-)?\d+"
+RELATIVE_FLOAT_PARAM = r"re:\^?(\+-)?\d+(\.\d+)?"
+
 alc = Alconna(
     "meme-stickers",
     Subcommand(
@@ -51,13 +63,13 @@ alc = Alconna(
         ),
         Option(
             "-x|--x",
-            Args["x", float],
-            help_text="文本基线 X 坐标",
+            Args["x", RELATIVE_FLOAT_PARAM],
+            help_text="文本基线 X 坐标（以 ^ 开头指偏移值）",
         ),
         Option(
             "-y|--y",
-            Args["y", float],
-            help_text="文本基线 Y 坐标",
+            Args["y", RELATIVE_FLOAT_PARAM],
+            help_text="文本基线 Y 坐标（以 ^ 开头指偏移值）",
         ),
         Option(
             "--align",
@@ -66,8 +78,8 @@ alc = Alconna(
         ),
         Option(
             "--rotate",
-            Args["rotate", float],
-            help_text="文本旋转角度",
+            Args["rotate", RELATIVE_FLOAT_PARAM],
+            help_text="文本旋转角度（以 ^ 开头指偏移值）",
         ),
         Option(
             "--color",
@@ -81,13 +93,13 @@ alc = Alconna(
         ),
         Option(
             "--stroke-width-factor",
-            Args["stroke_width_factor", float],
+            Args["stroke_width_factor", RELATIVE_FLOAT_PARAM],
             help_text="文本描边宽度系数",
         ),
         Option(
             "--font-size",
-            Args["font_size", float],
-            help_text="文本字号",
+            Args["font_size", RELATIVE_FLOAT_PARAM],
+            help_text="文本字号（以 ^ 开头指偏移值）",
         ),
         Option(
             "--font-style",
@@ -97,7 +109,7 @@ alc = Alconna(
         Option(
             "--auto-resize",
             action=store_true,
-            help_text="启用自动调整文本位置与尺寸",
+            help_text="启用自动调整文本位置与尺寸（默认启用，当 x 或 y 参数指定时会自动禁用，需要携带此参数以使用）",
         ),
         Option(
             "--no-auto-resize",
@@ -108,6 +120,11 @@ alc = Alconna(
             "--image-format",
             Args["image_format", str],
             help_text="输出文件类型",
+        ),
+        Option(
+            "--background",
+            Args["background", str],
+            help_text="当文件类型为 jpeg 时图片的背景色",
         ),
         Option(
             "--debug",
@@ -190,7 +207,14 @@ m_cls = on_alconna(
     use_cmd_sep=True,
 )
 
+T = TypeVar("T")
+
+
 EXIT_COMMANDS = ("0", "e", "exit", "q", "quit", "取消", "退出")
+COMMON_COMMANDS_TIP = "另外可以回复 0 来退出"
+
+RETURN_COMMANDS = ("r", "return", "back", "返回", "上一步")
+RETURN_COMMAND_TIP = "回复 r 来返回上一步"
 
 
 @asynccontextmanager
@@ -241,6 +265,12 @@ def create_illegal_finisher():
     return func
 
 
+def handle_idx_command(txt: str, items: Sequence[T], offset: int = -1) -> Optional[T]:
+    if txt.isdigit() and (1 <= (idx := int(txt)) <= len(items)):
+        return items[idx + offset]
+    return None
+
+
 async def sticker_pack_select(include_unavailable: bool = False) -> StickerPack:
     packs = pack_manager.packs if include_unavailable else pack_manager.available_packs
     if not packs:
@@ -255,7 +285,8 @@ async def sticker_pack_select(include_unavailable: bool = False) -> StickerPack:
         UniMessage.image(raw=pack_list_img)
         .text(
             "以上为当前可用贴纸包\n"
-            f"请在 {config.prompt_timeout} 秒内发送贴纸包 序号 / 代号 / 名称 进行选择",
+            f"请在 {config.prompt_timeout} 秒内发送贴纸包 序号 / 代号 / 名称 进行选择"
+            f"\n{COMMON_COMMANDS_TIP}",
         )
         .send()
     )
@@ -263,12 +294,169 @@ async def sticker_pack_select(include_unavailable: bool = False) -> StickerPack:
     illegal_finish = create_illegal_finisher()
     while True:
         txt, _ = await handle_prompt_common_commands(await prompt(""))
-        if txt.isdigit() and (1 <= (idx := int(txt)) <= len(pack_manager.packs)):
-            return pack_manager.packs[idx - 1]
-        if pack := pack_manager.find_pack(txt):
+        if (pack := handle_idx_command(txt, pack_manager.packs)) or (
+            pack := pack_manager.find_pack(txt)
+        ):
             return pack
         await illegal_finish()
         await UniMessage("未找到对应贴纸包，请重新发送").send()
+
+
+async def ensure_pack_available(pack: StickerPack):
+    if pack.unavailable:
+        await UniMessage(f"贴纸包 `{pack.slug}` 暂无法使用，自动退出操作").finish()
+
+
+async def only_sticker_select(pack: StickerPack) -> StickerInfo:
+    stickers = pack.manifest.resolved_stickers
+    sticker_params = [
+        model_copy(info.params, update={"text": f"{i}. {info.name}"})
+        for i, info in enumerate(stickers, 1)
+    ]
+
+    async with exception_notify("图片绘制失败"):
+        sticker_select_img = save_image(
+            draw_sticker_grid_from_params(
+                pack.manifest.sticker_grid.default_params,
+                sticker_params,
+                base_path=pack.base_path,
+            ),
+            skia.kJPEG,
+        )
+
+    await (
+        UniMessage.image(raw=sticker_select_img)
+        .text(
+            f"以下是贴纸包 `{pack.manifest.name}` 中的贴纸"
+            f"\n请发送 名称 / 序号 来选择"
+            f"\n{COMMON_COMMANDS_TIP}",
+        )
+        .send()
+    )
+    while True:
+        txt, _ = await handle_prompt_common_commands(await prompt(""))
+        await ensure_pack_available(pack)
+        if (sticker := handle_idx_command(txt, stickers)) or (
+            sticker := next(
+                (s for s in stickers if s.name.lower() == txt.lower()),
+                None,
+            )
+        ):
+            return sticker
+        await UniMessage("未找到对应贴纸，请重新发送").send()
+
+
+async def category_and_sticker_select(pack: StickerPack) -> StickerInfo:
+    stickers_by_category = pack.manifest.resolved_stickers_by_category
+    categories: list[str] = sorted(stickers_by_category.keys())
+
+    category_sample_stickers: list[StickerParams] = [
+        model_copy(stickers_by_category[c][0].params, update={"text": f"{i}. {c}"})
+        for i, c in enumerate(categories, 1)
+    ]
+
+    async with exception_notify("图片绘制失败"):
+        category_select_img = save_image(
+            draw_sticker_grid_from_params(
+                pack.manifest.sticker_grid.resolved_category_params,
+                category_sample_stickers,
+                base_path=pack.base_path,
+            ),
+            skia.kJPEG,
+        )
+
+    async def select_category() -> str:
+        await (
+            UniMessage.image(raw=category_select_img)
+            .text(
+                f"以下是该贴纸包内可用的贴纸分类"
+                f"\n请发送 名称 / 序号 来选择"
+                f"\n{COMMON_COMMANDS_TIP}",
+            )
+            .send()
+        )
+        illegal_finish = create_illegal_finisher()
+        while True:
+            txt, _ = await handle_prompt_common_commands(await prompt(""))
+            await ensure_pack_available(pack)
+            if (c := handle_idx_command(txt, categories)) or (
+                c := next((c for c in categories if c.lower() == txt.lower()), None)
+            ):
+                return c
+            await illegal_finish()
+            await UniMessage("未找到对应分类，请重新发送").send()
+
+    async def select_sticker(category: str) -> Optional[StickerInfo]:
+        """category select requested when return None"""
+
+        category_params = pack.manifest.sticker_grid.resolved_stickers_params
+        grid_params = category_params.get(
+            category,
+            pack.manifest.sticker_grid.default_params,
+        )
+        stickers = stickers_by_category[category]
+
+        all_stickers = pack.manifest.resolved_stickers
+        sticker_ids = [all_stickers.index(s) + 1 for s in stickers]
+
+        sticker_params = [
+            model_copy(info.params, update={"text": f"{i}. {info.name}"})
+            for i, info in zip(sticker_ids, stickers)
+        ]
+        async with exception_notify("图片绘制失败"):
+            sticker_select_img = save_image(
+                draw_sticker_grid_from_params(
+                    grid_params,
+                    sticker_params,
+                    pack.base_path,
+                ),
+                skia.kJPEG,
+            )
+
+        await (
+            UniMessage.image(raw=sticker_select_img)
+            .text(
+                f"以下是分类 `{category}` 中的贴纸"
+                f"\n请发送 名称 / 序号 来选择"
+                f"\n{COMMON_COMMANDS_TIP}、{RETURN_COMMAND_TIP}",
+            )
+            .send()
+        )
+
+        illegal_finish = create_illegal_finisher()
+        while True:
+            txt, _ = await handle_prompt_common_commands(await prompt(""))
+            await ensure_pack_available(pack)
+            if txt.lower() in RETURN_COMMANDS:
+                return None
+            if txt.isdigit() and (i := int(txt)) in sticker_ids:
+                return all_stickers[i - 1]
+            if s := next((s for s in stickers if s.name.lower() == txt.lower()), None):
+                return s
+            await illegal_finish()
+            await UniMessage("未找到对应贴纸，请重新发送").send()
+
+    while True:
+        category = await select_category()
+        if sticker := await select_sticker(category):
+            return sticker
+
+
+async def sticker_select(pack: StickerPack) -> StickerInfo:
+    if pack.manifest.sticker_grid.disable_category_select:
+        return await only_sticker_select(pack)
+    return await category_and_sticker_select(pack)
+
+
+async def prompt_sticker_text() -> str:
+    await UniMessage("请发送你想要写在贴纸上的文本").send()
+    illegal_finish = create_illegal_finisher()
+    while True:
+        txt, _ = await handle_prompt_common_commands(await prompt(""))
+        if txt:
+            return txt
+        await illegal_finish()
+        await UniMessage("文本不能为空，请重新发送").send()
 
 
 async def find_packs_with_notify(
@@ -324,6 +512,18 @@ def format_opt_info(
     return "\n".join(txt)
 
 
+async def find_dict_value_with_notify(d: dict[Any, T], key: Any, msg: str) -> T:
+    if key not in d:
+        await UniMessage(msg).finish()
+    return d[key]
+
+
+def resolve_relative_num(val: str, base: float) -> float:
+    if not val.startswith("^"):
+        return float(val)
+    return base + float(val.lstrip("^"))
+
+
 @m_cls.dispatch("~generate").handle()
 async def _(
     m: AlconnaMatcher,
@@ -332,28 +532,129 @@ async def _(
     q_sticker: Query[Optional[str]] = Query("~sticker", None),
     q_text: Query[Optional[str]] = Query("~text", None),
     # opts with args
-    q_x: Query[Optional[float]] = Query("~x", None),
-    q_y: Query[Optional[float]] = Query("~y", None),
-    q_align: Query[Optional[str]] = Query("~align", None),
-    q_rotate: Query[Optional[float]] = Query("~rotate", None),
-    q_color: Query[Optional[str]] = Query("~color", None),
-    q_stroke_color: Query[Optional[str]] = Query("~stroke_color", None),
-    q_stroke_width_factor: Query[Optional[float]] = Query("~stroke_width_factor", None),
-    q_font_size: Query[Optional[float]] = Query("~font_size", None),
-    q_font_style: Query[Optional[str]] = Query("~font_style", None),
-    q_image_format: Query[Optional[str]] = Query("~image_format", None),
+    q_x: Query[Optional[str]] = Query("~x.x", None),
+    q_y: Query[Optional[str]] = Query("~y.y", None),
+    q_align: Query[Optional[str]] = Query("~align.align", None),
+    q_rotate: Query[Optional[str]] = Query("~rotate.rotate", None),
+    q_color: Query[Optional[str]] = Query("~color.color", None),
+    q_stroke_color: Query[Optional[str]] = Query("~stroke_color.stroke_color", None),
+    q_stroke_width_factor: Query[Optional[str]] = Query(
+        "~stroke_width_factor.stroke_width_factor",
+        None,
+    ),
+    q_font_size: Query[Optional[str]] = Query("~font_size.font_size", None),
+    q_font_style: Query[Optional[str]] = Query("~font_style.font_style", None),
+    q_image_format: Query[Optional[str]] = Query("~image_format.image_format", None),
+    q_background: Query[Optional[str]] = Query("~background.background", default=None),
     # opts without args
     q_auto_resize: Query[Optional[bool]] = Query("~auto-resize.value", None),
     q_no_auto_resize: Query[Optional[bool]] = Query("~no-auto-resize.value", None),
     q_debug: Query[bool] = Query("~debug.value", default=False),
 ):
+    if q_align.result and (q_align.result not in TEXT_ALIGN_MAP):
+        await m.finish(f"文本对齐方式 `{q_align.result}` 未知")
+
+    async with exception_notify(f"颜色 `{q_color.result}` 格式不正确"):
+        color = resolve_color_to_tuple(q_color.result) if q_color.result else None
+
+    async with exception_notify(f"颜色 `{q_stroke_color.result}` 格式不正确"):
+        stroke_color = (
+            resolve_color_to_tuple(q_stroke_color.result)
+            if q_stroke_color.result
+            else None
+        )
+
+    if q_font_style.result and (q_font_style.result not in FONT_STYLE_FUNC_MAP):
+        await m.finish(f"字体风格 `{q_font_style.result}` 未知")
+
+    image_format = (
+        await find_dict_value_with_notify(
+            IMAGE_FORMAT_MAP,
+            q_image_format.result,
+            f"图片格式 `{q_image_format.result}` 未知",
+        )
+        if q_image_format.result
+        else IMAGE_FORMAT_MAP[config.default_sticker_image_format]
+    )
+
+    async with exception_notify(
+        f"颜色 `{q_background.result}` 格式不正确",
+        (ValueError,),
+    ):
+        background = (
+            skia.Color(*resolve_color_to_tuple(q_background.result))
+            if q_background.result
+            else config.default_sticker_background
+        )
+
     pack = (
         (await find_packs_with_notify(q_pack.result))[0]
         if q_pack.result
         else await sticker_pack_select()
     )
 
-    await m.send(str(locals()).replace(", ", ",\n"))
+    if q_sticker.result:
+        if q_sticker.result.isdigit():
+            sticker = pack.manifest.resolved_stickers[int(q_sticker.result) - 1]
+        else:
+            sticker = pack.manifest.find_sticker_by_name(q_sticker.result)
+    else:
+        sticker = await sticker_select(pack)
+    if not sticker:
+        await m.finish(f"未找到贴纸 `{q_sticker.result}`")
+
+    params = model_copy(sticker.params)
+
+    text = q_text.result or await prompt_sticker_text()
+    params.text = text
+
+    if q_x.result:
+        params.text_x = resolve_relative_num(q_x.result, params.text_x)
+    if q_y.result:
+        params.text_y = resolve_relative_num(q_y.result, params.text_y)
+    if q_align.result:
+        params.text_align = q_align.result
+    if q_rotate.result:
+        params.text_rotate_degrees = resolve_relative_num(
+            q_rotate.result,
+            params.text_rotate_degrees,
+        )
+    if color:
+        params.text_color = color
+    if stroke_color:
+        params.stroke_color = stroke_color
+    if q_stroke_width_factor.result:
+        params.stroke_width_factor = resolve_relative_num(
+            q_stroke_width_factor.result,
+            params.stroke_width_factor,
+        )
+    if q_font_size.result:
+        params.font_size = resolve_relative_num(q_font_size.result, params.font_size)
+    if q_font_style.result:
+        params.font_style = q_font_style.result
+
+    auto_resize = not (q_x.result or q_y.result)
+    if auto_resize and q_no_auto_resize.result:
+        auto_resize = False
+    if (not auto_resize) and q_auto_resize.result:
+        auto_resize = True
+
+    img = save_image(
+        make_surface_for_picture(
+            make_sticker_picture_from_params(
+                pack.base_path,
+                params,
+                auto_resize,
+                debug=q_debug.result,
+            ),
+            background if image_format == skia.kJPEG else None,
+        ),
+        image_format,
+    )
+    msg = UniMessage.image(raw=img)
+    # if q_debug.result:
+    #     msg += f"auto_resize = {auto_resize}"
+    await msg.finish()
 
 
 m_packs_cls = m_cls.dispatch("~packs")
@@ -441,7 +742,6 @@ async def _(
 
 
 # fallback help
-@m_packs_cls.assign("$main")
 @m_cls.assign("$main")
 async def _(m: AlconnaMatcher):
     await m.finish(alc.get_help())

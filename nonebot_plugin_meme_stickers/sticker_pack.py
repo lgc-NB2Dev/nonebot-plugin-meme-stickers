@@ -62,6 +62,7 @@ class StickerPack:
         else:
             self.reload_config()
 
+        self.outdated = False
         self._cached_merged_config: Optional[StickerPackConfig] = None
 
     @cached_property
@@ -88,7 +89,7 @@ class StickerPack:
 
     @property
     def unavailable(self) -> bool:
-        return self.merged_config.disabled or self.updating
+        return self.merged_config.disabled or self.updating or self.outdated
 
     def reload_manifest(self):
         self.manifest = type_validate_json(
@@ -441,6 +442,8 @@ class StickerPackManager:
         return func
 
     def reload(self, clear_updating_flags: bool = False):
+        for x in self.packs:
+            x.outdated = True
         self.packs.clear()
 
         opt_info = StickerPackOperationInfo[str]()
@@ -476,6 +479,10 @@ class StickerPackManager:
                 logger.debug(f"Successfully loaded pack `{path.name}`")
 
         logger.success(f"Successfully loaded {len(self.packs)} packs")
+
+        for x in self.reload_hooks:
+            x(self)
+
         return opt_info
 
     def find_pack_by_slug(
@@ -644,6 +651,7 @@ class StickerPackManager:
         return opt_info
 
     def delete(self, pack: StickerPack):
+        pack.outdated = True
         self.packs.remove(pack)
         shutil.rmtree(
             pack.base_path,

@@ -4,7 +4,7 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from typing import Optional, TypedDict, Union
+from typing import Callable, Optional, TypedDict, Union
 from typing_extensions import NotRequired, Unpack
 
 import skia
@@ -389,34 +389,25 @@ def make_sticker_picture(
     return pic_recorder.finishRecordingAsPicture()
 
 
-def transform_text_align(text_align: SkiaTextAlignType) -> skia.textlayout_TextAlign:
-    return {
-        "center": skia.textlayout_TextAlign.kCenter,
-        "end": skia.textlayout_TextAlign.kEnd,
-        "justify": skia.textlayout_TextAlign.kJustify,
-        "left": skia.textlayout_TextAlign.kLeft,
-        "right": skia.textlayout_TextAlign.kRight,
-        "start": skia.textlayout_TextAlign.kStart,
-    }[text_align]
-
-
-def transform_font_style(font_style: SkiaFontStyleType) -> skia.FontStyle:
-    return {
-        "bold": skia.FontStyle.Bold,
-        "bold_italic": skia.FontStyle.BoldItalic,
-        "italic": skia.FontStyle.Italic,
-        "normal": skia.FontStyle.Normal,
-    }[font_style]()
-
-
-def transform_image_type(
-    image_type: SkiaEncodedImageFormatType,
-) -> skia.EncodedImageFormat:
-    return {
-        "jpeg": skia.EncodedImageFormat.kJPEG,
-        "png": skia.EncodedImageFormat.kPNG,
-        "webp": skia.EncodedImageFormat.kWEBP,
-    }[image_type]
+TEXT_ALIGN_MAP: dict[SkiaTextAlignType, skia.textlayout_TextAlign] = {
+    "center": skia.textlayout_TextAlign.kCenter,
+    "end": skia.textlayout_TextAlign.kEnd,
+    "justify": skia.textlayout_TextAlign.kJustify,
+    "left": skia.textlayout_TextAlign.kLeft,
+    "right": skia.textlayout_TextAlign.kRight,
+    "start": skia.textlayout_TextAlign.kStart,
+}
+FONT_STYLE_FUNC_MAP: dict[SkiaFontStyleType, Callable[[], skia.FontStyle]] = {
+    "bold": skia.FontStyle.Bold,
+    "bold_italic": skia.FontStyle.BoldItalic,
+    "italic": skia.FontStyle.Italic,
+    "normal": skia.FontStyle.Normal,
+}
+IMAGE_FORMAT_MAP: dict[SkiaEncodedImageFormatType, skia.EncodedImageFormat] = {
+    "jpeg": skia.EncodedImageFormat.kJPEG,
+    "png": skia.EncodedImageFormat.kPNG,
+    "webp": skia.EncodedImageFormat.kWEBP,
+}
 
 
 def read_file_to_skia_image(path: Union[Path, str]) -> skia.Image:
@@ -438,17 +429,30 @@ def make_sticker_picture_from_params(
         text=params.text,
         text_x=params.text_x,
         text_y=params.text_y,
-        text_align=transform_text_align(params.text_align),
+        text_align=TEXT_ALIGN_MAP[params.text_align],
         text_rotate_degrees=params.text_rotate_degrees,
         text_color=skia.Color(*params.text_color),
         stroke_color=skia.Color(*params.stroke_color),
         stroke_width_factor=params.stroke_width_factor,
         font_size=params.font_size,
-        font_style=transform_font_style(params.font_style),
+        font_style=FONT_STYLE_FUNC_MAP[params.font_style](),
         font_families=params.font_families,
         auto_resize=auto_resize,
         debug=debug,
     )
+
+
+def make_surface_for_picture(
+    picture: skia.Picture,
+    background: Optional[int] = None,
+) -> skia.Surface:
+    bounds = picture.cullRect()
+    s = skia.Surface(math.floor(bounds.width()), math.floor(bounds.height()))
+    with s as canvas:
+        if background is not None:
+            canvas.drawColor(background)
+        canvas.drawPicture(picture)
+    return s
 
 
 def zoom_sticker(
@@ -686,7 +690,7 @@ def make_sticker_pack_card_picture(
     )
     sticker_pic = make_sticker_picture_from_params(
         base_path,
-        zoom_sticker(sample_sticker_params, sticker_ratio),
+        zoom_sticker(model_copy(sample_sticker_params), sticker_ratio),
         auto_resize=True,
     )
     with skia.AutoCanvasRestore(canvas):
@@ -796,19 +800,21 @@ def save_image(
     surface: skia.Surface,
     image_type: Union[skia.EncodedImageFormat, SkiaEncodedImageFormatType],
     quality: int = 95,
+    background: Optional[int] = None,
 ):
-    return (
-        surface.makeImageSnapshot()
-        .encodeToData(
-            (
-                transform_image_type(image_type)
-                if isinstance(image_type, str)
-                else image_type
-            ),
-            quality,
-        )
-        .bytes()
+    image_type = (
+        IMAGE_FORMAT_MAP[image_type] if isinstance(image_type, str) else image_type
     )
+
+    if image_type == skia.kJPEG:
+        new_surface = skia.Surface(surface.width(), surface.height())
+        with new_surface as canvas:
+            if background is not None:
+                canvas.drawColor(background)
+            canvas.drawImage(surface.makeImageSnapshot(), 0, 0)
+        surface = new_surface
+
+    return surface.makeImageSnapshot().encodeToData(image_type, quality).bytes()
 
 
 # 唉一开始就没设计好，整出来这么个玩意
