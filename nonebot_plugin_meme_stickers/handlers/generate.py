@@ -115,7 +115,9 @@ async def prompt_sticker_text() -> str:
     await UniMessage("请发送你想要写在贴纸上的文本").send()
     illegal_finish = create_illegal_finisher()
     while True:
-        txt, _ = await handle_prompt_common_commands(await prompt(""))
+        txt, _ = await handle_prompt_common_commands(
+            await prompt("", timeout=config.prompt_timeout),
+        )
         if txt:
             return txt
         await illegal_finish()

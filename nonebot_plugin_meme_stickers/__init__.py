@@ -35,5 +35,5 @@ driver = get_driver()
 async def _():
     pack_manager.reload(clear_updating_flags=True)
 
-    if config.meme_sticker_auto_update:
+    if config.auto_update:
         await asyncio.create_task(pack_manager.update(force=config.force_update))

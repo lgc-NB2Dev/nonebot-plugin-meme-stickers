@@ -131,17 +131,24 @@ class StickerPackManager:
     ) -> OpInfo[str]:
         logger.info("Collecting sticker packs need to update")
 
-        sem = create_req_sem()
+        opt_info = OpInfo[str]()
 
-        will_update = [
-            x
-            for x in self.packs
-            if (
-                ((packs is None) or (x.slug in packs))
-                and x.merged_config.update_source
-                and (not x.updating)
-            )
-        ]
+        will_update: list[StickerPack] = []
+        if packs:
+            for x in packs:
+                if pack := self.find_pack(x):
+                    will_update.append(pack)
+                else:
+                    logger.warning(f"Pack `{x}` not found")
+                    opt_info.failed.append(OpIt(x, "未找到贴纸包"))
+        else:
+            for x in self.packs:
+                if x.merged_config.update_source:
+                    will_update.append(x)
+                else:
+                    opt_info.skipped.append(OpIt(x.slug, "无更新源"))
+
+        sem = create_req_sem()
 
         async def fetch_manifest(p: StickerPack):
             assert p.merged_config.update_source
@@ -153,8 +160,6 @@ class StickerPackManager:
         manifests = dict(
             await asyncio.gather(*(fetch_manifest(x) for x in will_update)),
         )
-
-        opt_info = OpInfo[str]()
 
         for p in will_update.copy():
             local_v = p.manifest.version

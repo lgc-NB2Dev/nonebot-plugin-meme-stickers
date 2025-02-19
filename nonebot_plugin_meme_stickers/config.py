@@ -69,7 +69,7 @@ class ConfigModel(BaseConfigModel):
     retry_times: int = 3
     req_concurrency: int = 8
 
-    meme_sticker_auto_update: bool = True
+    auto_update: bool = True
     force_update: bool = False
 
     prompt_retries: int = 3

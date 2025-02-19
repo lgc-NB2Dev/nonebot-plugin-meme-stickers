@@ -130,7 +130,9 @@ async def sticker_pack_select(include_unavailable: bool = False) -> StickerPack:
 
     illegal_finish = create_illegal_finisher()
     while True:
-        txt, _ = await handle_prompt_common_commands(await prompt(""))
+        txt, _ = await handle_prompt_common_commands(
+            await prompt("", timeout=config.prompt_timeout),
+        )
         if (pack := handle_idx_command(txt, pack_manager.packs)) or (
             pack := pack_manager.find_pack(txt)
         ):
@@ -171,7 +173,9 @@ async def only_sticker_select(pack: StickerPack) -> StickerInfo:
         .send()
     )
     while True:
-        txt, _ = await handle_prompt_common_commands(await prompt(""))
+        txt, _ = await handle_prompt_common_commands(
+            await prompt("", timeout=config.prompt_timeout),
+        )
         await ensure_pack_available(pack)
         if (sticker := handle_idx_command(txt, stickers)) or (
             sticker := next(
@@ -214,7 +218,9 @@ async def category_and_sticker_select(pack: StickerPack) -> StickerInfo:
         )
         illegal_finish = create_illegal_finisher()
         while True:
-            txt, _ = await handle_prompt_common_commands(await prompt(""))
+            txt, _ = await handle_prompt_common_commands(
+                await prompt("", timeout=config.prompt_timeout),
+            )
             await ensure_pack_available(pack)
             if (c := handle_idx_command(txt, categories)) or (
                 c := next((c for c in categories if c.lower() == txt.lower()), None)
@@ -262,7 +268,9 @@ async def category_and_sticker_select(pack: StickerPack) -> StickerInfo:
 
         illegal_finish = create_illegal_finisher()
         while True:
-            txt, _ = await handle_prompt_common_commands(await prompt(""))
+            txt, _ = await handle_prompt_common_commands(
+                await prompt("", timeout=config.prompt_timeout),
+            )
             await ensure_pack_available(pack)
             if txt.lower() in RETURN_COMMANDS:
                 return None
