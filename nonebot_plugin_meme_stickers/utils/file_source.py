@@ -1,24 +1,58 @@
 import asyncio
 from collections.abc import Awaitable
-from typing import TYPE_CHECKING, Any, Generic, Optional, Protocol, TypedDict, TypeVar
-from typing_extensions import Unpack
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Generic,
+    Literal,
+    Optional,
+    Protocol,
+    TypedDict,
+    TypeVar,
+    Union,
+)
+from typing_extensions import TypeAlias, Unpack
 
 from cookit import TypeDecoCollector, copy_func_arg_annotations, nullcontext
 from httpx import AsyncClient
+from pydantic import BaseModel
 from yarl import URL
 
-from .config import config
-from .models import (
-    FileSource,
-    FileSourceGitHub,
-    FileSourceGitHubBranch,
-    FileSourceGitHubTag,
-    FileSourceURL,
-)
-from .utils import op_retry
+from ..config import config
+from ..utils import op_retry
 
 if TYPE_CHECKING:
     from httpx import Response
+
+
+class FileSourceGitHubBase(BaseModel):
+    type: Literal["github"] = "github"
+    owner: str
+    repo: str
+    path: Optional[str] = None
+
+
+class FileSourceGitHubBranch(FileSourceGitHubBase):
+    branch: str
+
+
+class FileSourceGitHubTag(FileSourceGitHubBase):
+    tag: str
+
+
+FileSourceGitHub: TypeAlias = Union[FileSourceGitHubBranch, FileSourceGitHubTag]
+
+
+class FileSourceURL(BaseModel):
+    type: Literal["url"] = "url"
+    url: str
+
+
+FileSource: TypeAlias = Union[
+    FileSourceGitHubBranch,
+    FileSourceGitHubTag,
+    FileSourceURL,
+]
 
 M = TypeVar("M", bound=FileSource)
 M_contra = TypeVar("M_contra", bound=FileSource, contravariant=True)

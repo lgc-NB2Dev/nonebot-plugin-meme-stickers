@@ -1,7 +1,6 @@
-import re
 from contextlib import contextmanager, suppress
 from textwrap import indent
-from typing import Any, Literal, Optional, TypeVar, Union, cast
+from typing import Any, Optional, TypeVar, Union
 from typing_extensions import Self, TypeAlias
 
 from cookit import deep_merge
@@ -13,37 +12,18 @@ from cookit.pyd import (
 )
 from pydantic import BaseModel, PrivateAttr, ValidationError
 
+from ..consts import (
+    RGBAColorTuple,
+    SkiaFontStyleType,
+    SkiaTextAlignType,
+    StickerGridGapType,
+    StickerGridPaddingType,
+    TRBLPaddingTuple,
+    XYGapTuple,
+)
+from ..utils.file_source import FileSource
+
 T = TypeVar("T")
-
-SkiaTextAlignType: TypeAlias = Literal[
-    "center", "end", "justify", "left", "right", "start",
-]  # fmt: skip
-SkiaFontStyleType: TypeAlias = Literal["bold", "bold_italic", "italic", "normal"]
-SkiaEncodedImageFormatType: TypeAlias = Literal["jpeg", "png", "webp"]
-RGBAColorTuple: TypeAlias = tuple[int, int, int, int]
-TRBLPaddingTuple: TypeAlias = tuple[float, float, float, float]
-StickerGridPaddingType: TypeAlias = Union[
-    float,  # t r b l
-    tuple[float],  # (t r b l)
-    tuple[float, float],  # (t b, l r)
-    tuple[float, float, float, float],  # (t, r, b, l)
-]
-XYGapTuple: TypeAlias = tuple[float, float]
-StickerGridGapType: TypeAlias = Union[
-    float,  # x and y
-    tuple[float],  # (x and y)
-    tuple[float, float],  # (x, y)
-]
-
-MANIFEST_FILENAME = "manifest.json"
-CHECKSUM_FILENAME = "checksum.json"
-HUB_MANIFEST_FILENAME = "manifest.json"
-CONFIG_FILENAME = "config.json"
-UPDATING_FLAG_FILENAME = ".updating"
-
-SHORT_HEX_COLOR_REGEX = re.compile(r"#?(?P<hex>[0-9a-fA-F]{3,4})")
-FULL_HEX_COLOR_REGEX = re.compile(r"#?(?P<hex>([0-9a-fA-F]{3,4}){2})")
-FLOAT_REGEX = re.compile(r"\d+(\.\d+)?")
 
 
 def validate_not_falsy(cls: BaseModel, value: T) -> T:  # noqa: ARG001
@@ -59,36 +39,6 @@ def wrap_validation_error(msg: str):
     except ValidationError as e:
         info = indent(str(e), "    ")
         raise ValueError(f"{msg}\n{info}") from e
-
-
-class FileSourceGitHubBase(BaseModel):
-    type: Literal["github"] = "github"
-    owner: str
-    repo: str
-    path: Optional[str] = None
-
-
-class FileSourceGitHubBranch(FileSourceGitHubBase):
-    branch: str
-
-
-class FileSourceGitHubTag(FileSourceGitHubBase):
-    tag: str
-
-
-FileSourceGitHub: TypeAlias = Union[FileSourceGitHubBranch, FileSourceGitHubTag]
-
-
-class FileSourceURL(BaseModel):
-    type: Literal["url"] = "url"
-    url: str
-
-
-FileSource: TypeAlias = Union[
-    FileSourceGitHubBranch,
-    FileSourceGitHubTag,
-    FileSourceURL,
-]
 
 
 class StickerParams(BaseModel):
@@ -319,13 +269,6 @@ class StickerPackManifest(BaseModel):
 ChecksumDict: TypeAlias = dict[str, str]
 OptionalChecksumDict: TypeAlias = dict[str, Optional[str]]
 
-StickersHubFileSource = FileSourceGitHubBranch(
-    owner="lgc-NB2Dev",
-    repo="meme-stickers-hub",
-    branch="main",
-    path=HUB_MANIFEST_FILENAME,
-)
-
 
 class HubStickerPackInfo(BaseModel):
     slug: str
@@ -335,41 +278,15 @@ class HubStickerPackInfo(BaseModel):
 HubManifest: TypeAlias = list[HubStickerPackInfo]
 
 
-def resolve_color_to_tuple(color: str) -> RGBAColorTuple:
-    sm: Optional[re.Match[str]] = None
-    fm: Optional[re.Match[str]] = None
-    if (sm := SHORT_HEX_COLOR_REGEX.fullmatch(color)) or (
-        fm := FULL_HEX_COLOR_REGEX.fullmatch(color)
-    ):
-        hex_str = (sm or cast(re.Match, fm))["hex"].upper()
-        if sm:
-            hex_str = "".join([x * 2 for x in hex_str])
-        hex_str = f"{hex_str}FF" if len(hex_str) == 6 else hex_str
-        return tuple(int(hex_str[i : i + 2], 16) for i in range(0, 8, 2))  # type: ignore
-
-    if (
-        (parts := color.lstrip("(").rstrip(")").split(",，"))
-        and (3 <= len(parts) <= 4)
-        # -
-        and (parts := [part.strip() for part in parts])
-        and all(x.isdigit() for x in parts[:3])
-        # -
-        and (rgb := [int(x) for x in parts[:3]])
-        and all(0 <= int(x) <= 255 for x in rgb)
-        # -
-        and (
-            (len(parts) == 3 and (a := 255))
-            or (parts[3].isdigit() and 0 <= (a := int(parts[3])) <= 255)
-            or (
-                FLOAT_REGEX.fullmatch(parts[3])
-                and 0 <= (a := int(float(parts[3]) * 255)) <= 255
-            )
-        )
-    ):
-        return (*rgb, a)  # type: ignore
-
-    raise ValueError(
-        f"Invalid color format: {color}."
-        f" supported formats: #RGB, #RRGGBB"
-        f", (R, G, B), (R, G, B, A), (R, G, B, a (0 ~ 1 float))",
-    )
+def zoom_sticker(
+    params: StickerParams,
+    zoom: float,
+    width: Optional[int] = None,
+    height: Optional[int] = None,
+) -> StickerParams:
+    params.width = width or round(params.width * zoom)
+    params.height = height or round(params.height * zoom)
+    params.text_x *= zoom
+    params.text_y *= zoom
+    params.font_size *= zoom
+    return params
