@@ -12,7 +12,7 @@ from nonebot_plugin_alconna import AlconnaMatcher, UniMessage, on_alconna
 from nonebot_plugin_waiter import prompt
 
 from ..config import config
-from ..consts import DESCRIPTION
+from ..consts import AUTHOR, DESCRIPTION
 from ..draw.grid import (
     draw_sticker_grid_from_packs,
     draw_sticker_grid_from_params,
@@ -24,11 +24,11 @@ from ..sticker_pack.pack import StickerPack
 
 T = TypeVar("T")
 
-
 alc = Alconna(
     "meme-stickers",
     meta=CommandMeta(
         description=DESCRIPTION,
+        author=AUTHOR,
     ),
 )
 m_cls = on_alconna(
@@ -37,7 +37,7 @@ m_cls = on_alconna(
     skip_for_unmatch=False,
     auto_send_output=True,
     use_cmd_start=True,
-    use_cmd_sep=True,
+    # use_cmd_sep=True,
 )
 
 

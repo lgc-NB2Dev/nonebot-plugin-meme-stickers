@@ -8,7 +8,7 @@ from nonebot.plugin import PluginMetadata, inherit_supported_adapters, require
 require("nonebot_plugin_alconna")
 
 from .config import ConfigModel, config
-from .consts import DESCRIPTION, NAME
+from .consts import AUTHOR, DESCRIPTION, NAME
 from .handlers import load_handlers
 from .sticker_pack import pack_manager
 
@@ -21,7 +21,7 @@ __plugin_meta__ = PluginMetadata(
     homepage="https://github.com/lgc-NB2Dev/nonebot-plugin-meme-stickers",
     config=ConfigModel,
     supported_adapters=inherit_supported_adapters("nonebot_plugin_alconna"),
-    extra={"License": "MIT", "Author": "LgCookie"},
+    extra={"License": "MIT", "Author": AUTHOR},
 )
 
 

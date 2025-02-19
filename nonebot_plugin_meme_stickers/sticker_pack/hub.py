@@ -1,17 +1,14 @@
 import asyncio
-from collections.abc import AsyncIterator
-from contextlib import asynccontextmanager
 from pathlib import Path
-from tempfile import TemporaryDirectory
 from typing import Optional
 from typing_extensions import Unpack
 
 from cookit.loguru import warning_suppress
 from cookit.pyd import model_copy, type_validate_json
-from yarl import URL
 
 from ..consts import CHECKSUM_FILENAME, HUB_MANIFEST_FILENAME, MANIFEST_FILENAME
 from ..draw.pack_list import StickerPackCardParams
+from ..utils import calc_checksum
 from ..utils.file_source import (
     FileSource,
     FileSourceGitHubBranch,
@@ -20,12 +17,7 @@ from ..utils.file_source import (
     fetch_github_source,
     fetch_source,
 )
-from .models import (
-    ChecksumDict,
-    HubManifest,
-    HubStickerPackInfo,
-    StickerPackManifest,
-)
+from .models import ChecksumDict, HubManifest, HubStickerPackInfo, StickerPackManifest
 
 STICKERS_HUB_FILE_SOURCE = FileSourceGitHubBranch(
     owner="lgc-NB2Dev",
@@ -96,35 +88,38 @@ async def fetch_hub_and_packs(
 
 
 # 唉一开始就没设计好，整出来这么个玩意
-@asynccontextmanager
 async def temp_sticker_card_params(
+    cache_dir: Path,
     hub: HubManifest,
     manifests: dict[str, StickerPackManifest],
+    checksums: Optional[dict[str, ChecksumDict]] = None,
     **req_kw: Unpack[ReqKwargs],
-) -> AsyncIterator[list[StickerPackCardParams]]:
+) -> list[StickerPackCardParams]:
     if "sem" not in req_kw:
         req_kw["sem"] = create_req_sem()
 
-    with TemporaryDirectory() as tmp_dir:
-        path = Path(tmp_dir)
+    async def task(i: int, info: HubStickerPackInfo):
+        manifest = manifests[info.slug]
+        sticker = model_copy(manifest.resolved_sample_sticker)
 
-        async def task(i: int, info: HubStickerPackInfo):
-            sticker = model_copy(manifests[info.slug].resolved_sample_sticker)
+        sticker_hash = (
+            checksums.get(info.slug, {}).get(sticker.base_image) if checksums else None
+        )
+        if (not sticker_hash) or not ((cache_dir / sticker_hash).exists()):
+            cache_dir.mkdir(parents=True, exist_ok=True)
             resp = await fetch_source(info.source, sticker.base_image)
+            if not sticker_hash:
+                sticker_hash = calc_checksum(resp.content)
+            (cache_dir / sticker_hash).write_bytes(resp.content)
 
-            filename = f"{info.slug}_{URL(sticker.base_image).name}"
-            (path / filename).write_bytes(resp.content)
-            sticker.base_image = filename
+        sticker.base_image = sticker_hash
+        return StickerPackCardParams(
+            base_path=cache_dir,
+            sample_sticker_params=sticker,
+            name=manifest.name,
+            slug=info.slug,
+            description=manifest.description,
+            index=str(i),
+        )
 
-            manifest = manifests[info.slug]
-            return StickerPackCardParams(
-                base_path=path,
-                sample_sticker_params=sticker,
-                name=manifest.name,
-                slug=info.slug,
-                description=manifest.description,
-                index=str(i),
-            )
-
-        cards = await asyncio.gather(*(task(i, x) for i, x in enumerate(hub, 1)))
-        yield cards
+    return await asyncio.gather(*(task(i, x) for i, x in enumerate(hub, 1)))

@@ -57,9 +57,7 @@ class StickerPackCardParams(TypedDict):
 
 def make_sticker_pack_card_picture(
     **kwargs: Unpack[StickerPackCardParams],
-) -> tuple[skia.Picture, int, int]:
-    """Returns: (picture, width, height)"""
-
+) -> skia.Picture:
     base_path = kwargs["base_path"]
     sample_sticker_params = kwargs["sample_sticker_params"]
     name = kwargs["name"]
@@ -151,27 +149,29 @@ def make_sticker_pack_card_picture(
         canvas.translate(text_x_offset, text_y_offset)
         para.paint(canvas, 0, 0)
 
-    pic = recorder.finishRecordingAsPicture()
-    return pic, pic_w, pic_h
+    return recorder.finishRecordingAsPicture()
 
 
 def draw_sticker_pack_grid(params: list[StickerPackCardParams]):
-    cards = [(p, make_sticker_pack_card_picture(**p)) for p in params]
-    splitted_cards = list(chunks(cards, DEFAULT_CARD_GRID_COLS))
-    first_line_items = len(splitted_cards[0])
-
-    card_w = max(x[1][1] for x in cards)
-    card_lines_h = [max(x[1][2] for x in row) for row in splitted_cards]
-
-    surface_w = (
-        DEFAULT_CARD_GRID_PADDING * 2
-        + DEFAULT_CARD_GRID_GAP * (first_line_items - 1)
-        + card_w * first_line_items
+    cards = [make_sticker_pack_card_picture(**p) for p in params]
+    rectangles = [x.cullRect() for x in cards]
+    splitted_cards = list(
+        chunks(tuple(zip(cards, rectangles, params)), DEFAULT_CARD_GRID_COLS),
     )
-    surface_h = (
+
+    card_w = max(x[1].width() for x in splitted_cards[0])
+    card_lines_h = [max(x[1].height() for x in row) for row in splitted_cards]
+
+    first_line_len = len(splitted_cards[0])
+    surface_w = round(
+        DEFAULT_CARD_GRID_PADDING * 2
+        + DEFAULT_CARD_GRID_GAP * (first_line_len - 1)
+        + card_w * first_line_len,
+    )
+    surface_h = round(
         DEFAULT_CARD_GRID_PADDING * 2
         + DEFAULT_CARD_GRID_GAP * (len(splitted_cards) - 1)
-        + sum(card_lines_h)
+        + sum(card_lines_h),
     )
     surface = skia.Surface(surface_w, surface_h)
 
@@ -181,8 +181,8 @@ def draw_sticker_pack_grid(params: list[StickerPackCardParams]):
         canvas.translate(DEFAULT_CARD_GRID_PADDING, DEFAULT_CARD_GRID_PADDING)
 
         for row, row_h in zip(splitted_cards, card_lines_h):
-            for p, (pic, _, content_h) in row:
-                unavailable = p.get("unavailable", False)
+            for pic, rect, param in row:
+                unavailable = param.get("unavailable", False)
                 rect = skia.Rect.MakeWH(card_w, row_h)
                 canvas.drawRoundRect(
                     rect,
@@ -208,7 +208,7 @@ def draw_sticker_pack_grid(params: list[StickerPackCardParams]):
                     ),
                 )
                 with skia.AutoCanvasRestore(canvas):
-                    canvas.translate(0, (row_h - content_h) / 2)
+                    canvas.translate(0, (row_h - rect.height()) / 2)
                     canvas.drawPicture(pic)
                 canvas.translate(card_w + DEFAULT_CARD_GRID_GAP, 0)
             canvas.translate(

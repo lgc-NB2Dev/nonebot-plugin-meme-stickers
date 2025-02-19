@@ -1,3 +1,5 @@
+import asyncio
+
 import skia
 from arclet.alconna import Args, MultiVar, Option, store_true
 from nonebot import logger
@@ -5,15 +7,19 @@ from nonebot.permission import SUPERUSER
 from nonebot.typing import T_State
 from nonebot_plugin_alconna import AlconnaMatcher, Query, UniMessage
 
+from ..config import config
+from ..consts import PREVIEW_CACHE_DIR_NAME
 from ..draw.grid import draw_sticker_grid_from_packs
 from ..draw.pack_list import draw_sticker_pack_grid
 from ..draw.tools import save_image
 from ..sticker_pack import pack_manager
 from ..sticker_pack.hub import (
+    fetch_checksum,
     fetch_hub_and_packs,
     temp_sticker_card_params,
 )
 from ..sticker_pack.pack import StickerPack
+from ..utils.file_source import create_req_sem
 from ..utils.operation import OpInfo, OpIt, format_op
 from .shared import alc, exception_notify, find_packs_with_notify, m_cls
 
@@ -29,7 +35,7 @@ alc.subcommand(
         action=store_true,
         help_text="不显示无法使用的贴纸包",
     ),
-    help_text="查看本地或 Hub 上的贴纸包列表",
+    help_text="查看本地或 Hub 上的贴纸包列表（仅超级用户）",
 )
 
 
@@ -39,12 +45,28 @@ async def _(
     q_no_unavailable: Query[bool] = Query("~no-unavailable.value", default=False),
 ):
     if q_online.result:
-        async with exception_notify("从 Hub 获取贴纸包列表与信息失败"):
+        async with exception_notify("从 Hub 获取贴纸包信息失败"):
             hub, manifests = await fetch_hub_and_packs()
         if not manifests:
             await UniMessage("Hub 上无可用贴纸包").finish()
-
-        async with exception_notify("下载用于预览的贴纸失败"), temp_sticker_card_params(hub, manifests) as params, exception_notify("图片绘制失败"):  # fmt: skip
+        async with exception_notify("从 Hub 获取贴纸包信息失败"):
+            sem = create_req_sem()
+            checksums = dict(
+                zip(
+                    (x.slug for x in hub),
+                    await asyncio.gather(
+                        *(fetch_checksum(x.source, sem=sem) for x in hub),
+                    ),
+                ),
+            )
+        async with exception_notify("下载用于预览的贴纸失败"):
+            params = await temp_sticker_card_params(
+                config.data_dir / PREVIEW_CACHE_DIR_NAME,
+                hub,
+                manifests,
+                checksums,
+            )
+        async with exception_notify("图片绘制失败"):
             pic = save_image(draw_sticker_pack_grid(params), skia.kJPEG)
         await UniMessage.image(raw=pic).text("以上为 Hub 中可用的贴纸包列表").finish()
 
@@ -63,7 +85,7 @@ async def _(
 
 alc.subcommand(
     "reload",
-    help_text="重新加载本地贴纸包",
+    help_text="重新加载本地贴纸包（仅超级用户）",
 )
 
 
@@ -77,7 +99,7 @@ async def _(m: AlconnaMatcher):
 alc.subcommand(
     "install",
     Args["slugs#要下载的贴纸包代号", MultiVar(str, "+")],
-    help_text="从 Hub 下载贴纸包",
+    help_text="从 Hub 下载贴纸包（仅超级用户）",
 )
 
 
@@ -99,7 +121,7 @@ alc.subcommand(
         action=store_true,
         help_text="忽略本地版本，强制更新",
     ),
-    help_text="从 Hub 更新贴纸包",
+    help_text="从 Hub 更新贴纸包（仅超级用户）",
 )
 
 
@@ -116,7 +138,7 @@ alc.subcommand(
         action=store_true,
         help_text="跳过确认提示",
     ),
-    help_text="删除本地贴纸包",
+    help_text="删除本地贴纸包（仅超级用户）",
 )
 
 
@@ -128,11 +150,11 @@ async def _(m: AlconnaMatcher):
 alc.subcommand(
     "disable",
     Args["packs#要删除的贴纸包 ID / 代号 / 名称", MultiVar(str, "+")],
-    help_text="删除本地贴纸包",
+    help_text="禁用本地贴纸包（仅超级用户）",
 ).subcommand(
     "enable",
     Args["packs#要删除的贴纸包 ID / 代号 / 名称", MultiVar(str, "+")],
-    help_text="删除本地贴纸包",
+    help_text="启用本地贴纸包（仅超级用户）",
 )
 
 
