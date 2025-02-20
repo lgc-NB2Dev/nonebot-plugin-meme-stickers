@@ -58,6 +58,7 @@ def collect_local_files(path: Path) -> list[str]:
     ]
 
 
+# TODO refactor sticker pack manage, improve pack state change event emit
 async def update_sticker_pack(
     pack_path: Path,
     source: FileSource,
