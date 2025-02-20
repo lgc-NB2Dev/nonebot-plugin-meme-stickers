@@ -63,7 +63,7 @@ class StickerPackManager:
             # self.base_path.mkdir(parents=True)
 
         paths = (
-            self.base_path / x
+            x
             for x in self.base_path.iterdir()
             if x.is_dir() and (x / MANIFEST_FILENAME).exists()
         )

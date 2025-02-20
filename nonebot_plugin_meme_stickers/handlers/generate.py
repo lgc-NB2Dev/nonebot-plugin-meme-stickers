@@ -23,6 +23,7 @@ from .shared import (
     exception_notify,
     find_dict_value_with_notify,
     find_packs_with_notify,
+    handle_idx_command,
     handle_prompt_common_commands,
     m_cls,
     sticker_pack_select,
@@ -196,13 +197,14 @@ async def _(
         else await sticker_pack_select()
     )
 
-    if q_sticker.result:
-        if q_sticker.result.isdigit():
-            sticker = pack.manifest.resolved_stickers[int(q_sticker.result) - 1]
-        else:
-            sticker = pack.manifest.find_sticker_by_name(q_sticker.result)
-    else:
-        sticker = await sticker_select(pack)
+    sticker = (
+        (
+            handle_idx_command(q_sticker.result, pack.manifest.resolved_stickers)
+            or pack.manifest.find_sticker_by_name(q_sticker.result)
+        )
+        if q_sticker.result
+        else await sticker_select(pack)
+    )
     if not sticker:
         await m.finish(f"未找到贴纸 `{q_sticker.result}`")
 

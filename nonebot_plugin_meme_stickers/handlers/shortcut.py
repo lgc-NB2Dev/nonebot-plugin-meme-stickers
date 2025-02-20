@@ -3,7 +3,7 @@ from nonebot import logger
 from ..sticker_pack import pack_manager
 from ..sticker_pack.manager import StickerPackManager
 from ..sticker_pack.pack import StickerPack
-from .shared import alc, m_cls
+from .shared import alc
 
 registered_commands: dict[str, set[str]] = {}
 
@@ -34,5 +34,6 @@ def reregister_shortcuts(_: StickerPackManager, pack: StickerPack):
 
     if new_commands:
         for x in new_commands:
-            m_cls.shortcut(x, arguments=["generate", pack.slug], prefix=True)
+            msg = alc.shortcut(x, arguments=["generate", pack.slug], prefix=True)
+            logger.debug(msg)
         registered_commands[pack.slug] = new_commands

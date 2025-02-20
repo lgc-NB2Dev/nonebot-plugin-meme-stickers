@@ -1,4 +1,5 @@
 import asyncio
+from typing import Optional
 
 import skia
 from arclet.alconna import Args, MultiVar, Option, store_true
@@ -101,14 +102,14 @@ alc.subcommand(
 
 @m_cls.dispatch("~reload", permission=SUPERUSER).handle()
 async def _(m: AlconnaMatcher):
-    async with exception_notify("重新加载本地贴纸包失败"):
-        pack_manager.reload()
-    await m.finish("已重新加载本地贴纸包")
+    async with exception_notify("出现未知错误"):
+        op = pack_manager.reload()
+    await m.finish(f"已重新加载本地贴纸包\n{format_op(op)}")
 
 
 alc.subcommand(
     "install",
-    Args["slugs#要下载的贴纸包代号", MultiVar(str, "+")],
+    Args["packs#要下载的贴纸包代号", MultiVar(str, "+")],
     help_text="从 Hub 下载贴纸包（仅超级用户）",
     alias=["ins", "download", "add"],
 )
@@ -122,7 +123,11 @@ async def _(
     async with RecallContext() as ctx, exception_notify("出现未知错误"):
         await ctx.send("正在下载贴纸包，请稍候")
         op = await pack_manager.install(q_packs.result)
-    await m.finish(f"贴纸包安装结果：\n{format_op(op)}")
+    await m.finish(
+        f"贴纸包安装结果："
+        f"\n{format_op(op)}"
+        f"\n建议检查后台输出，如提示贴纸包有额外字体请按提示手动安装",
+    )
 
 
 alc.subcommand(
@@ -146,7 +151,7 @@ alc.subcommand(
 @m_cls.dispatch("~update", permission=SUPERUSER).handle()
 async def _(
     m: AlconnaMatcher,
-    q_packs: Query[list[str]] = Query("~packs"),
+    q_packs: Query[Optional[list[str]]] = Query("~packs", None),
     q_all: Query[bool] = Query("~all.value", default=False),
     q_force: Query[bool] = Query("~force.value", default=False),
 ):
@@ -155,7 +160,11 @@ async def _(
     async with RecallContext() as ctx, exception_notify("出现未知错误"):
         await ctx.send("正在下载贴纸包，请稍候")
         op = await pack_manager.update(q_packs.result or None, q_force.result)
-    await m.finish(f"贴纸包更新结果：\n{format_op(op)}")
+    await m.finish(
+        f"贴纸包更新结果："
+        f"\n{format_op(op)}"
+        f"\n建议检查后台输出，如提示贴纸包有额外字体请按提示手动安装",
+    )
 
 
 alc.subcommand(
