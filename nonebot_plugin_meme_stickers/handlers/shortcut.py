@@ -3,27 +3,27 @@ from nonebot import logger
 from ..sticker_pack import pack_manager
 from ..sticker_pack.manager import StickerPackManager
 from ..sticker_pack.pack import StickerPack
-from .shared import alc
+from .shared import alc, m_cls
 
 registered_commands: dict[str, set[str]] = {}
 
 
 @pack_manager.add_callback
 def reregister_shortcuts(_: StickerPackManager, pack: StickerPack):
-    pack_available = not pack.unavailable
+    available = not pack.unavailable
     registered = registered_commands.get(pack.slug)
     new_commands = (
         {
             *pack.merged_config.commands,
             *pack.merged_config.extend_commands,
         }
-        if pack_available
+        if available
         else None
     )
 
     logger.debug(
         f"Pack `{pack.slug}` state changed, reregistering shortcuts"
-        f" (`{registered}` -> `{new_commands}`)",
+        f" ({available=}, `{registered}` -> `{new_commands}`)",
     )
 
     if registered:
@@ -34,6 +34,5 @@ def reregister_shortcuts(_: StickerPackManager, pack: StickerPack):
 
     if new_commands:
         for x in new_commands:
-            msg = alc.shortcut(x, arguments=["generate", pack.slug], prefix=True)
-            logger.debug(msg)
+            m_cls.shortcut(x, arguments=["generate", pack.slug], prefix=True)
         registered_commands[pack.slug] = new_commands
