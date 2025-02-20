@@ -2,7 +2,7 @@ import asyncio
 import shutil
 from collections.abc import Iterable
 from pathlib import Path
-from typing import Any, Callable, Optional, TypeVar, Union
+from typing import Any, Callable, Optional, TypeVar
 from typing_extensions import TypeAlias
 
 from cookit.loguru import warning_suppress
@@ -16,43 +16,39 @@ from .models import HubManifest, StickerPackManifest
 from .pack import StickerPack
 from .update import update_sticker_pack
 
-ManagerReloadHook: TypeAlias = Callable[["StickerPackManager"], Any]
-TMH = TypeVar("TMH", bound=ManagerReloadHook)
+PackStateChangedCbFromManager: TypeAlias = Callable[
+    ["StickerPackManager", StickerPack],
+    Any,
+]
+TC = TypeVar("TC", bound=PackStateChangedCbFromManager)
 
 
 class StickerPackManager:
     def __init__(
         self,
         base_path: Path,
-        reload_hooks: Union[
-            ManagerReloadHook,
-            Iterable[ManagerReloadHook],
-            None,
-        ] = None,
         init_auto_load: bool = False,
         init_load_clear_updating_flags: bool = False,
+        state_change_callbacks: Optional[list[PackStateChangedCbFromManager]] = None,
     ) -> None:
         self.base_path = base_path
         self.packs: list[StickerPack] = []
-        self.reload_hooks: list[ManagerReloadHook] = (
-            []
-            if reload_hooks is None
-            else ([reload_hooks] if callable(reload_hooks) else list(reload_hooks))
-        )
         if init_auto_load:
             self.reload(init_load_clear_updating_flags)
+
+        self.state_change_callbacks = state_change_callbacks or []
 
     @property
     def available_packs(self) -> list[StickerPack]:
         return [x for x in self.packs if not x.unavailable]
 
-    def register_reload_hook(self, func: TMH) -> TMH:
-        self.reload_hooks.append(func)
+    def add_callback(self, func: TC) -> TC:
+        self.state_change_callbacks.append(func)
         return func
 
-    def _call_reload_hooks(self):
-        for x in self.reload_hooks:
-            x(self)
+    def wrapped_call_callbacks(self, pack: StickerPack) -> None:
+        for cb in self.state_change_callbacks:
+            cb(self, pack)
 
     def reload(self, clear_updating_flags: bool = False):
         for x in self.packs:
@@ -82,7 +78,12 @@ class StickerPackManager:
                 logger.warning(f"Cleared updating flag of pack `{path.name}`")
 
             try:
-                self.packs.append(StickerPack(path))
+                self.packs.append(
+                    StickerPack(
+                        path,
+                        state_change_callbacks=[self.wrapped_call_callbacks],
+                    ),
+                )
             except Exception as e:
                 opt_info.failed.append(OpIt(path.name, exc=e))
                 with warning_suppress(f"Failed to load pack `{path.name}`"):
@@ -92,7 +93,6 @@ class StickerPackManager:
                 logger.debug(f"Successfully loaded pack `{path.name}`")
 
         logger.success(f"Successfully loaded {len(self.packs)} packs")
-        self._call_reload_hooks()
         return opt_info
 
     def find_pack_with_checker(

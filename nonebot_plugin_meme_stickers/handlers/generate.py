@@ -84,7 +84,10 @@ alc.subcommand(
     Option(
         "-A|--auto-resize",
         action=store_true,
-        help_text="启用自动调整文本位置与尺寸（默认启用，当 x 或 y 参数指定时会自动禁用，需要携带此参数以使用）",
+        help_text=(
+            "启用自动调整文本位置与尺寸"
+            "（默认启用，当 x 或 y 参数指定时会自动禁用，需要携带此参数以使用）"
+        ),
     ),
     Option(
         "-N|--no-auto-resize",

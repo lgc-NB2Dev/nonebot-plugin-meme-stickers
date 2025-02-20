@@ -173,7 +173,7 @@ async def update_sticker_pack(
         logger.debug(f"Updating manifest and config of pack `{slug}`")
         pack = StickerPack(
             base_path=pack_path,
-            manifest_init=manifest,
+            init_manifest=manifest,
         )
         pack.config.update_source = source
         pack.save_config()
