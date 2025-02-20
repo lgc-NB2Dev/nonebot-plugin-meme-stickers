@@ -28,6 +28,16 @@ def collect_manifest_files(manifest: StickerPackManifest) -> list[str]:
         files.extend(x.path for x in manifest.external_fonts)
     if manifest.default_sticker_params.base_image:
         files.append(manifest.default_sticker_params.base_image)
+    grid = manifest.sticker_grid
+    files.extend(
+        x
+        for x in (
+            grid.default_params.background,
+            grid.category_override_params.background,
+            *(x.background for x in grid.stickers_override_params.values()),
+        )
+        if isinstance(x, str)
+    )
     files.extend(img for x in manifest.stickers if (img := x.params.base_image))
     return files
 
