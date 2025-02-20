@@ -25,12 +25,11 @@ from ..sticker_pack.pack import StickerPack
 from ..utils.file_source import create_req_sem
 from ..utils.operation import OpInfo, OpIt, format_op
 from .shared import (
-    COMMON_COMMANDS_TIP,
     alc,
     exception_notify,
     find_packs_with_notify,
-    handle_prompt_common_commands,
     m_cls,
+    timeout_finish,
 )
 
 alc.subcommand(
@@ -186,7 +185,7 @@ async def _(
     q_packs: Query[list[str]] = Query("~packs"),
     q_yes: Query[bool] = Query("~yes.value", default=False),
 ):
-    packs = await find_packs_with_notify(*q_packs.result)
+    packs = await find_packs_with_notify(*q_packs.result, include_unavailable=True)
     if q_yes.result:
         op = OpInfo[StickerPack]()
         for pack in packs:
@@ -202,13 +201,12 @@ async def _(
     for pack in packs:
         async with RecallContext() as ctx:
             await ctx.send(
-                f"是否真的要删除贴纸包 `{pack.slug}`？"
-                f"输入 Y 确定，输入其他内容取消。"
-                f"{COMMON_COMMANDS_TIP}",
+                f"是否真的要删除贴纸包 `{pack.slug}`？输入 Y 确定，输入其他内容取消。",
             )
-            ans, _ = await handle_prompt_common_commands(
-                await prompt("", timeout=config.prompt_timeout),
-            )
+            msg = await prompt("", timeout=config.prompt_timeout)
+            if not msg:
+                await timeout_finish()
+            ans = msg.extract_plain_text().strip()
             if ans.lower() != "y":
                 await m.send(f"已取消贴纸包 `{pack.slug}` 删除操作")
                 continue

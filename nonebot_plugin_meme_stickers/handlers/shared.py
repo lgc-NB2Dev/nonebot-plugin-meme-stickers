@@ -71,11 +71,11 @@ async def exception_notify(
 
 
 async def exit_finish() -> NoReturn:
-    await UniMessage("已退出选择").finish()
+    await UniMessage("已退出操作").finish()
 
 
 async def timeout_finish() -> NoReturn:
-    await UniMessage("等待超时，已退出选择").finish()
+    await UniMessage("等待超时，已退出操作").finish()
 
 
 async def handle_prompt_common_commands(
