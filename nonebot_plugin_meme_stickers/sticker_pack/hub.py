@@ -104,7 +104,7 @@ async def temp_sticker_card_params(
         sticker_hash = (
             checksums.get(info.slug, {}).get(sticker.base_image) if checksums else None
         )
-        if (not sticker_hash) or not ((cache_dir / sticker_hash).exists()):
+        if (not sticker_hash) or (not (cache_dir / sticker_hash).exists()):
             cache_dir.mkdir(parents=True, exist_ok=True)
             resp = await fetch_source(info.source, sticker.base_image)
             if not sticker_hash:
