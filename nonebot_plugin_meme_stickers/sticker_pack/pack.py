@@ -8,13 +8,13 @@ from cookit import deep_merge
 from cookit.pyd import type_dump_python, type_validate_json
 from nonebot import logger
 
-from nonebot_plugin_meme_stickers.sticker_pack.update import update_sticker_pack
-
 from ..consts import CONFIG_FILENAME, MANIFEST_FILENAME, UPDATING_FLAG_FILENAME
 from ..utils import dump_readable_model
-from ..utils.file_source import ReqKwargs
+from ..utils.file_source import ReqKwargs, create_client, create_req_sem
 from ..utils.operation import op_val_formatter
+from .hub import fetch_manifest
 from .models import HubStickerPackInfo, StickerPackConfig, StickerPackManifest
+from .update import UpdatedResourcesInfo, update_sticker_pack
 
 PackStateChangedCb: TypeAlias = Callable[["StickerPack"], Any]
 TC = TypeVar("TC", bound=PackStateChangedCb)
@@ -77,6 +77,17 @@ class StickerPack:
             or self.updating
             or self.deleted
         )
+
+    @property
+    def unavailable_reason(self) -> Optional[str]:
+        if self.merged_config.disabled:
+            return "已禁用"
+        if self.updating:
+            return "更新中"
+        if (ro := self.ref_outdated) or self.deleted:
+            t = "引用过期" if ro else "已删除"
+            return f"异常状态: {t}"
+        return None
 
     def set_ref_outdated(self, notify: bool = True):
         self._ref_outdated = True
@@ -159,12 +170,30 @@ class StickerPack:
         self,
         manifest: Optional[StickerPackManifest] = None,
         notify: bool = True,
+        force: bool = False,
         **req_kw: Unpack[ReqKwargs],
-    ):
+    ) -> Optional[UpdatedResourcesInfo]:
         s = self.merged_config.update_source
         if not s:
             raise NotImplementedError("This pack has no update source")
-        await update_sticker_pack(
+
+        if "cli" not in req_kw:
+            req_kw["cli"] = create_client()
+        if "sem" not in req_kw:
+            req_kw["sem"] = create_req_sem()
+
+        if not manifest:
+            manifest = await fetch_manifest(s, **req_kw)
+
+        if (not force) and self.manifest.version >= manifest.version:
+            logger.debug(
+                f"Skip update pack `{self.slug}`"
+                f" (v_local={self.manifest.version}, v_remote={manifest.version}"
+                f", {force=})",
+            )
+            return None
+
+        r = await update_sticker_pack(
             self.base_path,
             s,
             manifest,
@@ -174,6 +203,7 @@ class StickerPack:
         self.reload(notify=False)
         if notify:
             self.call_callbacks()
+        return r
 
     def delete(self, notify: bool = True):
         self.manifest_path.unlink()

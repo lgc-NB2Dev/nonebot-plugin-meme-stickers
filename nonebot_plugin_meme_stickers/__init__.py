@@ -2,7 +2,7 @@
 
 import asyncio
 
-from nonebot import get_driver
+from nonebot import get_driver, logger
 from nonebot.plugin import PluginMetadata, inherit_supported_adapters, require
 
 require("nonebot_plugin_alconna")
@@ -11,6 +11,7 @@ from .config import ConfigModel, config
 from .consts import AUTHOR, DESCRIPTION, NAME
 from .handlers import load_handlers
 from .sticker_pack import pack_manager
+from .utils.operation import format_op
 
 __version__ = "0.1.0"
 __plugin_meta__ = PluginMetadata(
@@ -36,4 +37,11 @@ async def _():
     pack_manager.reload(clear_updating_flags=True)
 
     if config.auto_update:
-        await asyncio.create_task(pack_manager.update(force=config.force_update))
+
+        async def do_update():
+            logger.info("Updating packs")
+            op, _ = await pack_manager.update_all(force=config.force_update)
+            for x in format_op(op).splitlines():
+                logger.success(x)
+
+        asyncio.create_task(do_update())

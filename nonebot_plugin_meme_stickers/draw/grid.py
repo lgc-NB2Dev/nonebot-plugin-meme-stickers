@@ -152,8 +152,8 @@ def draw_sticker_grid_from_packs(packs: list[StickerPack]):
             slug=p.slug,
             description=p.manifest.description,
             index=str(i),
-            unavailable=(u := p.unavailable),
-            unavailable_reason=(("更新中" if p.updating else "已禁用") if u else None),
+            unavailable=p.unavailable,
+            unavailable_reason=p.unavailable_reason,
         )
         for (i, p) in enumerate(packs, 1)
     ]

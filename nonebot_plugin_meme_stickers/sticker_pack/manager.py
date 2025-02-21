@@ -1,9 +1,14 @@
+import asyncio
 from pathlib import Path
 from typing import Any, Callable, Optional, TypeVar, Union
 from typing_extensions import TypeAlias, Unpack
 
 from cookit.loguru import warning_suppress
 from nonebot import logger
+
+from nonebot_plugin_meme_stickers.sticker_pack.hub import (
+    fetch_optional_manifest,
+)
 
 from ..consts import MANIFEST_FILENAME, UPDATING_FLAG_FILENAME
 from ..utils.file_source import FileSource, ReqKwargs
@@ -120,6 +125,45 @@ class StickerPackManager:
             lambda x: x.slug.lower() == query or x.manifest.name.lower() == query,
             include_unavailable,
         )
+
+    async def update_all(
+        self,
+        force: bool = False,
+        **req_kw: Unpack[ReqKwargs],
+    ) -> tuple[OpInfo[StickerPack], dict[str, UpdatedResourcesInfo]]:
+        op_info = OpInfo[StickerPack]()
+
+        async def update(p: StickerPack):
+            if p.updating:
+                op_info.skipped.append(OpIt(p, "已在更新中"))
+                logger.warning(f"Pack `{p.slug}` is updating, skip")
+                return None
+
+            manifest = (
+                await fetch_optional_manifest(s, **req_kw)
+                if (s := p.merged_config.update_source)
+                else None
+            )
+            if not manifest:
+                op_info.failed.append(OpIt(p, "获取贴纸包信息失败"))
+                return None
+
+            try:
+                r = await p.update(force=force, **req_kw)
+            except Exception as e:
+                op_info.failed.append(OpIt(p, exc=e))
+                with warning_suppress(f"Failed to update pack `{p.slug}`"):
+                    raise
+            else:
+                if r:
+                    op_info.succeed.append(OpIt(p))
+                else:
+                    op_info.skipped.append(OpIt(p, "无须更新"))
+                return r
+
+        res = await asyncio.gather(*(update(p) for p in self.packs))
+        updated_info = {p.slug: v for p, v in zip(self.packs, res) if v}
+        return op_info, updated_info
 
     async def install(
         self,
