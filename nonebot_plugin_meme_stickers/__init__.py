@@ -41,6 +41,7 @@ async def _():
         async def do_update():
             logger.info("Updating packs")
             op, _ = await pack_manager.update_all(force=config.force_update)
+            logger.success("Update finished")
             for x in format_op(op).splitlines():
                 logger.success(x)
 

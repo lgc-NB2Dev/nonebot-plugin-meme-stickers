@@ -1,5 +1,5 @@
 import asyncio
-from typing import Optional
+from typing import Optional, Union
 
 import skia
 from arclet.alconna import Args, MultiVar, Option, store_true
@@ -18,19 +18,17 @@ from ..draw.tools import save_image
 from ..sticker_pack import pack_manager
 from ..sticker_pack.hub import (
     fetch_checksum,
+    fetch_hub,
     fetch_hub_and_packs,
     temp_sticker_card_params,
 )
+from ..sticker_pack.manager import update_packs
+from ..sticker_pack.models import HubStickerPackInfo
 from ..sticker_pack.pack import StickerPack
+from ..sticker_pack.update import UpdatedResourcesInfo
 from ..utils.file_source import create_req_sem
 from ..utils.operation import OpInfo, OpIt, format_op
-from .shared import (
-    alc,
-    exception_notify,
-    find_packs_with_notify,
-    m_cls,
-    timeout_finish,
-)
+from .shared import alc, exception_notify, find_packs_with_notify, m_cls, timeout_finish
 
 alc.subcommand(
     "list",
@@ -106,6 +104,18 @@ async def _(m: AlconnaMatcher):
     await m.finish(f"已重新加载本地贴纸包\n{format_op(op)}")
 
 
+def format_external_fonts_tip(updated_res: dict[str, UpdatedResourcesInfo]) -> str:
+    fonts_updated_packs = [k for k, v in updated_res.items() if v.fonts]
+    return (
+        (
+            f"\n\n贴纸包 {', '.join(f'`{x}`' for x in fonts_updated_packs)} 有额外字体更新"
+            f"，请按照控制台日志提示手动安装到系统以正常使用"
+        )
+        if fonts_updated_packs
+        else ""
+    )
+
+
 alc.subcommand(
     "install",
     Args["packs#要下载的贴纸包代号", MultiVar(str, "+")],
@@ -119,13 +129,42 @@ async def _(
     m: AlconnaMatcher,
     q_packs: Query[list[str]] = Query("~packs"),
 ):
-    async with RecallContext() as ctx, exception_notify("出现未知错误"):
+    existed = [x for x in q_packs.result if pack_manager.find_pack(x)]
+    if existed:
+        await m.finish(f"以下贴纸包已存在：\n{', '.join(f'`{x}`' for x in existed)}")
+
+    async with exception_notify("从 Hub 获取贴纸包信息失败"):
+        hub = await fetch_hub()
+
+    not_founds: list[str] = []
+    infos: list[HubStickerPackInfo] = []
+    for x in q_packs.result:
+        if info := next((y for y in hub if y.slug == x), None):
+            infos.append(info)
+        else:
+            not_founds.append(x)
+
+    if not_founds:
+        await m.finish(f"以下贴纸包不存在：\n{', '.join(f'`{x}`' for x in not_founds)}")
+
+    op = OpInfo[Union[StickerPack, str]]()
+    updated_res: dict[str, UpdatedResourcesInfo] = {}
+
+    async def install(info: HubStickerPackInfo):
+        try:
+            pack, r = await pack_manager.install(info.slug, info.source)
+        except Exception as e:
+            logger.exception(f"Failed to install pack {info.slug}")
+            op.failed.append(OpIt(info.slug, exc=e))
+        else:
+            op.succeed.append(OpIt(pack))
+            updated_res[info.slug] = r
+
+    async with RecallContext() as ctx:
         await ctx.send("正在下载贴纸包，请稍候")
-        op = await pack_manager.install(q_packs.result)
+        await asyncio.gather(*(install(x) for x in infos))
     await m.finish(
-        f"贴纸包安装结果："
-        f"\n{format_op(op)}"
-        f"\n建议检查后台输出，如提示贴纸包有额外字体请按提示手动安装",
+        f"贴纸包安装结果：\n{format_op(op)}{format_external_fonts_tip(updated_res)}",
     )
 
 
@@ -156,13 +195,21 @@ async def _(
 ):
     if not q_packs.result and not q_all.result:
         await m.finish("请指定要更新的贴纸包或使用选项 -a / --all 更新所有贴纸包")
-    async with RecallContext() as ctx, exception_notify("出现未知错误"):
-        await ctx.send("正在下载贴纸包，请稍候")
-        op = await pack_manager.update(q_packs.result or None, q_force.result)
+
+    if q_packs.result:
+        packs = await find_packs_with_notify(*q_packs.result, include_unavailable=True)
+        updating = [x.slug for x in packs if x.updating]
+        if updating:
+            await m.finish(
+                f"以下贴纸包正在更新中：\n{', '.join(f'`{x}`' for x in updating)}",
+            )
+    else:
+        packs = pack_manager.packs
+
+    async with exception_notify("出现未知错误"):
+        op, updated_res = await update_packs(packs, force=q_force.result)
     await m.finish(
-        f"贴纸包更新结果："
-        f"\n{format_op(op)}"
-        f"\n建议检查后台输出，如提示贴纸包有额外字体请按提示手动安装",
+        f"贴纸包更新结果：\n{format_op(op)}{format_external_fonts_tip(updated_res)}",
     )
 
 
@@ -190,7 +237,7 @@ async def _(
         op = OpInfo[StickerPack]()
         for pack in packs:
             try:
-                pack_manager.delete(pack)
+                pack.delete()
             except Exception as e:
                 logger.exception(f"Failed to delete pack {pack.slug}")
                 op.failed.append(OpIt(pack, exc=e))
@@ -212,7 +259,7 @@ async def _(
                 continue
 
         try:
-            pack_manager.delete(pack)
+            pack.delete()
         except Exception:
             logger.exception(f"Failed to delete pack {pack.slug}")
             await UniMessage(f"删除贴纸包 `{pack.slug}` 失败").send()

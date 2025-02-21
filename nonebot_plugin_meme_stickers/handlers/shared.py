@@ -26,10 +26,7 @@ T = TypeVar("T")
 
 alc = Alconna(
     "meme-stickers",
-    meta=CommandMeta(
-        description=DESCRIPTION,
-        author=AUTHOR,
-    ),
+    meta=CommandMeta(description=DESCRIPTION, author=AUTHOR),
 )
 m_cls = on_alconna(
     alc,
@@ -166,7 +163,7 @@ async def only_sticker_select(pack: StickerPack) -> StickerInfo:
     await (
         UniMessage.image(raw=sticker_select_img)
         .text(
-            f"以下是贴纸包 `{pack.manifest.name}` 中的贴纸"
+            f"以上是贴纸包 `{pack.manifest.name}` 中的贴纸"
             f"\n请发送 名称 / 序号 来选择"
             f"\n{COMMON_COMMANDS_TIP}",
         )
@@ -210,7 +207,7 @@ async def category_and_sticker_select(pack: StickerPack) -> StickerInfo:
         await (
             UniMessage.image(raw=category_select_img)
             .text(
-                f"以下是该贴纸包内可用的贴纸分类"
+                f"以上是该贴纸包内可用的贴纸分类"
                 f"\n请发送 名称 / 序号 来选择"
                 f"\n{COMMON_COMMANDS_TIP}",
             )
@@ -259,7 +256,7 @@ async def category_and_sticker_select(pack: StickerPack) -> StickerInfo:
         await (
             UniMessage.image(raw=sticker_select_img)
             .text(
-                f"以下是分类 `{category}` 中的贴纸"
+                f"以上是分类 `{category}` 中的贴纸"
                 f"\n请发送 名称 / 序号 来选择"
                 f"\n{COMMON_COMMANDS_TIP}、{RETURN_COMMAND_TIP}",
             )

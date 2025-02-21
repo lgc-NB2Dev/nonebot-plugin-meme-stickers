@@ -87,7 +87,6 @@ async def fetch_hub_and_packs(
     return hub, packs_dict
 
 
-# 唉一开始就没设计好，整出来这么个玩意
 async def temp_sticker_card_params(
     cache_dir: Path,
     hub: HubManifest,
