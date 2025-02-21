@@ -1,15 +1,17 @@
 import asyncio
 import shutil
-from contextlib import contextmanager
+from contextlib import contextmanager, nullcontext
+from dataclasses import dataclass
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from typing import Optional
+from typing import Any, Callable, Optional
 from typing_extensions import Unpack
 
+from cookit.pyd.compat import type_validate_json
 from nonebot import logger
 
 from ..consts import CONFIG_FILENAME, MANIFEST_FILENAME, UPDATING_FLAG_FILENAME
-from ..utils import calc_checksum_from_file
+from ..utils import calc_checksum_from_file, dump_readable_model
 from ..utils.file_source import (
     FileSource,
     ReqKwargs,
@@ -18,8 +20,7 @@ from ..utils.file_source import (
     fetch_source,
 )
 from .hub import fetch_manifest, fetch_optional_checksum
-from .models import StickerPackManifest
-from .pack import StickerPack
+from .models import StickerPackConfig, StickerPackManifest
 
 
 def collect_manifest_files(manifest: StickerPackManifest) -> list[str]:
@@ -58,13 +59,19 @@ def collect_local_files(path: Path) -> list[str]:
     ]
 
 
-# TODO refactor sticker pack manage, improve pack state change event emit
+@dataclass
+class UpdatedResourcesInfo:
+    assets: set[str]
+    fonts: set[str]
+
+
 async def update_sticker_pack(
     pack_path: Path,
     source: FileSource,
     manifest: Optional[StickerPackManifest] = None,
+    file_update_start_callback: Optional[Callable[[], Any]] = None,
     **req_kw: Unpack[ReqKwargs],
-) -> StickerPack:
+):
     slug = pack_path.name
 
     if (pack_path / UPDATING_FLAG_FILENAME).exists():
@@ -105,67 +112,49 @@ async def update_sticker_pack(
         files_should_download.update(file_both_exist)
 
     download_total = len(files_should_download)
+    downloaded_count = 0
+
+    async def download(base: Path, path: str):
+        nonlocal downloaded_count
+        r = await fetch_source(source, path, **req_kw)
+        p = base / path
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.write_bytes(r.content)
+        downloaded_count += 1
+        is_info = downloaded_count % 10 == 0 or (
+            downloaded_count in (1, download_total)
+        )
+        logger.log(
+            "INFO" if is_info else "DEBUG",
+            (
+                f"[{downloaded_count} / {download_total}] "
+                f"Downloaded of pack `{slug}`: {path}"
+            ),
+        )
 
     @contextmanager
-    def update_flag_file_ctx():
-        if not pack_path.exists():
-            pack_path.mkdir(parents=True, exist_ok=True)
+    def file_updating_ctx():
+        pack_path.mkdir(parents=True, exist_ok=True)
         flag_path = pack_path / UPDATING_FLAG_FILENAME
         flag_path.touch()
+        if file_update_start_callback:
+            file_update_start_callback()
         yield
         flag_path.unlink()
 
-    async def do_update(tmp_dir_path: Path):
-        if "sem" not in req_kw:
-            req_kw["sem"] = create_req_sem()
-
-        downloaded_count = 0
-
-        async def download(path: str):
-            nonlocal downloaded_count
-            r = await fetch_source(source, path, **req_kw)
-            p = tmp_dir_path / path
-            p.parent.mkdir(parents=True, exist_ok=True)
-            p.write_bytes(r.content)
-            downloaded_count += 1
-            is_info = downloaded_count % 10 == 0 or (
-                downloaded_count in (1, download_total)
-            )
-            logger.log(
-                "INFO" if is_info else "DEBUG",
-                (
-                    f"[{downloaded_count} / {download_total}] "
-                    f"Downloaded of pack `{slug}`: {path}"
-                ),
-            )
-
-        await asyncio.gather(*(download(x) for x in files_should_download))
-
-        logger.info(f"Moving downloaded files to data dir of pack `{slug}`")
+    def move_files(tmp_dir: Path):
         for path in files_should_download:
-            src_p = tmp_dir_path / path
+            src_p = tmp_dir / path
             dst_p = pack_path / path
             dst_p.parent.mkdir(parents=True, exist_ok=True)
             shutil.move(src_p, dst_p)
 
-    with update_flag_file_ctx():
-        if not download_total:
-            logger.info(f"No files need to update for pack `{slug}`")
-        else:
-            logger.info(
-                f"Pack `{slug}`"
-                f" collected {download_total} files will update from remote,"
-                f" downloading to temp dir",
-            )
-            with TemporaryDirectory() as tmp_dir:
-                await do_update(Path(tmp_dir))
-
+    def after_ops():
         # collect files should remove from local
         files_should_remove = local_files_set - remote_files_set
         if files_should_remove:
             logger.info(
-                f"Removing {len(files_should_remove)} not needed files"
-                f" from pack `{slug}`",
+                f"Removing {len(files_should_remove)} not needed files from pack `{slug}`",
             )
             for path in files_should_remove:
                 (pack_path / path).unlink()
@@ -182,27 +171,65 @@ async def update_sticker_pack(
                 p.rmdir()
 
         logger.debug(f"Updating manifest and config of pack `{slug}`")
-        pack = StickerPack(
-            base_path=pack_path,
-            init_manifest=manifest,
+        (pack_path / MANIFEST_FILENAME).write_text(
+            dump_readable_model(manifest, exclude_default=True, exclude_unset=True),
+            "u8",
         )
-        pack.config.update_source = source
-        pack.save_config()
+
+        config_path = pack_path / CONFIG_FILENAME
+        config = (
+            type_validate_json(StickerPackConfig, config_path.read_text("u8"))
+            if config_path.exists()
+            else StickerPackConfig()
+        )
+        config.update_source = source
+        config_path.write_text(
+            dump_readable_model(config, exclude_unset=True),
+            "u8",
+        )
+
+    tmp_dir_ctx = TemporaryDirectory() if download_total else nullcontext()
+    with tmp_dir_ctx as tmp_dir_str:
+        tmp_dir = Path(tmp_dir_str) if tmp_dir_str else None
+
+        if tmp_dir:
+            logger.info(
+                f"Pack `{slug}`"
+                f" collected {download_total} files will update from remote,"
+                f" downloading to temp dir",
+            )
+            if "sem" not in req_kw:
+                req_kw["sem"] = create_req_sem()
+            await asyncio.gather(
+                *(download(tmp_dir, x) for x in files_should_download),
+            )
+        else:
+            logger.info(f"No files need to update for pack `{slug}`")
+
+        with file_updating_ctx():
+            if tmp_dir:
+                logger.info(f"Moving downloaded files to data dir of pack `{slug}`")
+                move_files(tmp_dir)
+            after_ops()
 
     external_fonts_updated = {
         x.path for x in manifest.external_fonts if x.path in files_should_download
     }
     if external_fonts_updated:
-        logger.warning(f"Pack `{slug}` updated these external font(s):")
-        for x in external_fonts_updated:
-            logger.warning(f"  - {(pack_path / x).resolve()}")
+        logger.warning(f"Base path: {pack_path}")
+        logger.warning(f"Pack `{slug}` updated with the following external font(s).")
+        logger.warning(f"贴纸包 `{slug}` 更新了如下额外字体文件，")
         logger.warning(
             "Don't forget to install them into system then restart bot to use!",
         )
         logger.warning(
-            f"贴纸包 `{slug}` 更新了如上额外字体文件，"
-            f"请不要忘记安装这些字体文件到系统中，然后重启 Bot 以正常使用本插件功能！",
+            "请不要忘记安装这些字体文件到系统中，然后重启 Bot 以正常使用本插件功能！",
         )
+        for x in external_fonts_updated:
+            logger.warning(f"  - {x}")
 
     logger.info(f"Successfully updated pack `{slug}`")
-    return pack
+    return UpdatedResourcesInfo(
+        assets=files_should_download - external_fonts_updated,
+        fonts=external_fonts_updated,
+    )
