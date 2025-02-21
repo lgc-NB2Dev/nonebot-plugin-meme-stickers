@@ -101,7 +101,7 @@ def create_illegal_finisher():
 
 def handle_idx_command(txt: str, items: Sequence[T]) -> Optional[T]:
     if txt.isdigit() and (1 <= (idx := int(txt)) <= len(items)):
-        return items[idx + 1]
+        return items[idx - 1]
     return None
 
 
