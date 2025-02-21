@@ -47,7 +47,7 @@ async def _(m: AlconnaMatcher):
 EXIT_COMMANDS = ("0", "e", "exit", "q", "quit", "取消", "退出")
 COMMON_COMMANDS_TIP = "另外可以回复 0 来退出"
 
-RETURN_COMMANDS = ("r", "return", "back", "返回", "上一步")
+RETURN_COMMANDS = ("r", "return", "b", "back", "返回", "上一步")
 RETURN_COMMAND_TIP = "回复 r 来返回上一步"
 
 
