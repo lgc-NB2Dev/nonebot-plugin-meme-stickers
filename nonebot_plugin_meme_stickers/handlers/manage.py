@@ -2,7 +2,7 @@ import asyncio
 from typing import Optional, Union
 
 import skia
-from arclet.alconna import Args, MultiVar, Option, store_true
+from arclet.alconna import Arg, Args, MultiVar, Option, store_true
 from cookit.nonebot.alconna import RecallContext
 from nonebot import logger
 from nonebot.permission import SUPERUSER
@@ -118,7 +118,9 @@ def format_external_fonts_tip(updated_res: dict[str, UpdatedResourcesInfo]) -> s
 
 alc.subcommand(
     "install",
-    Args["packs#要下载的贴纸包代号", MultiVar(str, "+")],
+    Args(
+        Arg("packs", MultiVar(str, "+"), notice="要下载的贴纸包代号"),
+    ),
     help_text="从 Hub 下载贴纸包（仅超级用户）",
     alias=["ins", "download", "add"],
 )
@@ -170,7 +172,9 @@ async def _(
 
 alc.subcommand(
     "update",
-    Args["packs?#要更新的贴纸包 ID / 代号 / 名称", MultiVar(str, "+")],
+    Args(
+        Arg("packs", MultiVar(str, "+"), notice="要更新的贴纸包 ID / 代号 / 名称"),
+    ),
     Option(
         "-a|--all",
         action=store_true,
@@ -206,7 +210,8 @@ async def _(
     else:
         packs = pack_manager.packs
 
-    async with exception_notify("出现未知错误"):
+    async with RecallContext() as ctx, exception_notify("出现未知错误"):
+        await ctx.send("正在更新贴纸包，请稍候")
         op, updated_res = await update_packs(packs, force=q_force.result)
     await m.finish(
         f"贴纸包更新结果：\n{format_op(op)}{format_external_fonts_tip(updated_res)}",
@@ -215,7 +220,9 @@ async def _(
 
 alc.subcommand(
     "delete",
-    Args["packs#要删除的贴纸包 ID / 代号 / 名称", MultiVar(str, "+")],
+    Args(
+        Arg("packs", MultiVar(str, "+"), notice="要删除的贴纸包 ID / 代号 / 名称"),
+    ),
     Option(
         "-y|--yes",
         action=store_true,
@@ -269,11 +276,15 @@ async def _(
 
 alc.subcommand(
     "disable",
-    Args["packs#要删除的贴纸包 ID / 代号 / 名称", MultiVar(str, "+")],
+    Args(
+        Arg("packs", MultiVar(str, "+"), notice="要禁用的贴纸包 ID / 代号 / 名称"),
+    ),
     help_text="禁用本地贴纸包（仅超级用户）",
 ).subcommand(
     "enable",
-    Args["packs#要删除的贴纸包 ID / 代号 / 名称", MultiVar(str, "+")],
+    Args(
+        Arg("packs", MultiVar(str, "+"), notice="要启用的贴纸包 ID / 代号 / 名称"),
+    ),
     help_text="启用本地贴纸包（仅超级用户）",
 )
 

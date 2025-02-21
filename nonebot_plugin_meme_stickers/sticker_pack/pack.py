@@ -80,13 +80,13 @@ class StickerPack:
 
     @property
     def unavailable_reason(self) -> Optional[str]:
-        if self.merged_config.disabled:
-            return "已禁用"
         if self.updating:
             return "更新中"
         if (ro := self.ref_outdated) or self.deleted:
             t = "引用过期" if ro else "已删除"
             return f"异常状态: {t}"
+        if self.merged_config.disabled:
+            return "已禁用"
         return None
 
     def set_ref_outdated(self, notify: bool = True):
@@ -193,16 +193,18 @@ class StickerPack:
             )
             return None
 
-        r = await update_sticker_pack(
-            self.base_path,
-            s,
-            manifest,
-            self.call_callbacks if notify else None,
-            **req_kw,
-        )
-        self.reload(notify=False)
-        if notify:
-            self.call_callbacks()
+        try:
+            r = await update_sticker_pack(
+                self.base_path,
+                s,
+                manifest,
+                self.call_callbacks if notify else None,
+                **req_kw,
+            )
+            self.reload(notify=False)
+        finally:
+            if notify:
+                self.call_callbacks()
         return r
 
     def delete(self, notify: bool = True):

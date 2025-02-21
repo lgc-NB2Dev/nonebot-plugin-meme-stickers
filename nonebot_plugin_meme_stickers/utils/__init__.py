@@ -3,6 +3,7 @@ import json
 from pathlib import Path
 from typing import TypeVar
 
+from cookit.common.other import copy_func_arg_annotations
 from cookit.pyd import type_dump_python
 from nonebot import logger
 from tenacity import RetryCallState, retry, stop_after_attempt, wait_fixed
@@ -55,9 +56,10 @@ def calc_checksum_from_file(path: Path) -> str:
     return calc_checksum(path.read_bytes())
 
 
-def dump_readable_model(obj: object, **type_dump_kw) -> str:
+@copy_func_arg_annotations(type_dump_python)
+def dump_readable_model(data: object, **type_dump_kw) -> str:
     return json.dumps(
-        type_dump_python(obj, **type_dump_kw),
+        type_dump_python(data, **type_dump_kw),
         indent=2,
         ensure_ascii=False,
     )

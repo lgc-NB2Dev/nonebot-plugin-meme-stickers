@@ -139,8 +139,10 @@ async def update_sticker_pack(
         flag_path.touch()
         if file_update_start_callback:
             file_update_start_callback()
-        yield
-        flag_path.unlink()
+        try:
+            yield
+        finally:
+            flag_path.unlink()
 
     def move_files(tmp_dir: Path):
         for path in files_should_download:
@@ -172,7 +174,7 @@ async def update_sticker_pack(
 
         logger.debug(f"Updating manifest and config of pack `{slug}`")
         (pack_path / MANIFEST_FILENAME).write_text(
-            dump_readable_model(manifest, exclude_default=True, exclude_unset=True),
+            dump_readable_model(manifest, exclude_defaults=True, exclude_unset=True),
             "u8",
         )
 

@@ -33,9 +33,9 @@ from .shared import (
 alc.subcommand(
     "generate",
     Args(  # not using Optional to avoid subcommand match
-        Arg("pack?#贴纸包 代号 / 名称", str),
-        Arg("sticker?#贴纸 ID / 名称", str),
-        Arg("text?#贴纸文本", str),
+        Arg("pack?", str, notice="贴纸包 ID / 代号 / 名称"),
+        Arg("sticker?", str, notice="贴纸 ID / 名称"),
+        Arg("text?", str, notice="贴纸文本"),
     ),
     Option(
         "-x|--x",

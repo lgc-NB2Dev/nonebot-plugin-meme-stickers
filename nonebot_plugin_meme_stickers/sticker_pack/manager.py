@@ -63,6 +63,7 @@ class StickerPackManager:
         return p
 
     def reload(self, clear_updating_flags: bool = False):
+        logger.debug("Unloading packs")
         for x in self.packs:
             x.set_ref_outdated()
         self.packs.clear()
@@ -74,6 +75,7 @@ class StickerPackManager:
             return op_info
             # self.base_path.mkdir(parents=True)
 
+        logger.info("Reloading packs")
         slugs = (
             x.name
             for x in self.base_path.iterdir()
@@ -117,6 +119,8 @@ class StickerPackManager:
         include_unavailable: bool = False,
     ) -> Optional[StickerPack]:
         query = query.lower()
+        if query.isdigit() and 1 <= (x := int(query)) <= len(self.packs):
+            return self.packs[x - 1]
         return self.find_pack_with_checker(
             lambda x: x.slug.lower() == query or x.manifest.name.lower() == query,
             include_unavailable,
