@@ -130,7 +130,7 @@ async def sticker_pack_select(include_unavailable: bool = False) -> StickerPack:
         txt, _ = await handle_prompt_common_commands(
             await prompt("", timeout=config.prompt_timeout),
         )
-        if (pack := handle_idx_command(txt, pack_manager.packs)) or (
+        if (pack := handle_idx_command(txt, packs)) or (
             pack := pack_manager.find_pack(txt)
         ):
             return pack

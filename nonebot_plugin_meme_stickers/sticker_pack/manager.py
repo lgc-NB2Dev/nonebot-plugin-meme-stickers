@@ -120,7 +120,7 @@ class StickerPackManager:
     ) -> Optional[StickerPack]:
         query = query.lower()
         if query.isdigit() and 1 <= (x := int(query)) <= len(self.packs):
-            return self.packs[x - 1]
+            return (self.packs if include_unavailable else self.available_packs)[x - 1]
         return self.find_pack_with_checker(
             lambda x: x.slug.lower() == query or x.manifest.name.lower() == query,
             include_unavailable,
