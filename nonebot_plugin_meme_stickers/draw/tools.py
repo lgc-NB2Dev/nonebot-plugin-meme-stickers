@@ -10,6 +10,17 @@ font_mgr = skia.FontMgr()
 font_collection = skia.textlayout.FontCollection()
 font_collection.setDefaultFontManager(font_mgr)
 
+SYSTEM_MONOSPACE_FONTS = [
+    "JetBrains Mono",
+    "Fira Code",
+    "Cascadia Code",
+    "Consolas",
+    "Lucida Console",
+    "Menlo",
+    "Monaco",
+    "Source Code Pro",
+    "Ubuntu Mono",
+]
 FALLBACK_SYSTEM_FONTS = [
     "Arial",
     "Tahoma",
@@ -29,6 +40,7 @@ FALLBACK_SYSTEM_FONTS = [
 ]
 
 DEFAULT_BACKGROUND_COLOR = 0xFF282C34
+DEFAULT_TEXT_COLOR = 0xFFD7DAE0
 
 TEXT_ALIGN_MAP: dict[SkiaTextAlignType, skia.textlayout_TextAlign] = {
     "center": skia.textlayout_TextAlign.kCenter,
@@ -250,3 +262,36 @@ def save_image(
         surface = new_surface
 
     return surface.makeImageSnapshot().encodeToData(image_type, quality).bytes()
+
+
+def text_to_picture(
+    text: str,
+    padding: int = 32,
+    font_size: int = 32,
+    font_families: Optional[list[str]] = None,
+    font_style: Optional[skia.FontStyle] = None,
+    text_align: skia.textlayout_TextAlign = skia.textlayout_TextAlign.kLeft,
+    background: int = DEFAULT_BACKGROUND_COLOR,
+    foreground: int = DEFAULT_TEXT_COLOR,
+) -> skia.Picture:
+    para_style = skia.textlayout.ParagraphStyle()
+    para_style.setTextAlign(text_align)
+    text_style = make_text_style(
+        foreground,
+        font_size,
+        font_families or SYSTEM_MONOSPACE_FONTS,
+        font_style or skia.FontStyle.Normal(),
+    )
+    para = make_simple_paragraph(para_style, text_style, text, layout=True)
+
+    width = math.ceil(para.LongestLine) + padding * 2
+    height = math.ceil(para.Height) + padding * 2
+
+    recorder = skia.PictureRecorder()
+    canvas = recorder.beginRecording(width, height)
+
+    canvas.clear(background)
+    canvas.translate(padding, padding)
+    para.paint(canvas, 0, 0)
+
+    return recorder.finishRecordingAsPicture()

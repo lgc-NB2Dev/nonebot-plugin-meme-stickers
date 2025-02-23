@@ -50,7 +50,49 @@ _✨ 一站式制作 PJSK 样式表情包 ✨_
 
 ## 📖 介绍
 
-这里是插件的详细介绍部分
+### 贴纸包
+
+<details>
+
+<summary>示例图（点击展开）</summary>
+
+![help](https://raw.githubusercontent.com/lgc-NB2Dev/readme/main/meme-stickers/QQ20250224-005554.png)  
+![help](https://raw.githubusercontent.com/lgc-NB2Dev/readme/main/meme-stickers/QQ20250224-005814.png)
+
+</details>
+
+### 生成贴纸（交互模式与短指令）
+
+<details>
+
+<summary>示例图（点击展开）</summary>
+
+![help](https://raw.githubusercontent.com/lgc-NB2Dev/readme/main/meme-stickers/QQ20250224-005959.png)
+![help](https://raw.githubusercontent.com/lgc-NB2Dev/readme/main/meme-stickers/QQ20250224-010006.png)
+![help](https://raw.githubusercontent.com/lgc-NB2Dev/readme/main/meme-stickers/QQ20250224-010034.png)
+
+</details>
+
+### 生成贴纸（命令形式）
+
+<details>
+
+<summary>示例图（点击展开）</summary>
+
+![help](https://raw.githubusercontent.com/lgc-NB2Dev/readme/main/meme-stickers/QQ20250224-010206.png)
+
+</details>
+
+### 启用、禁用贴纸包
+
+<details>
+
+<summary>示例图（点击展开）</summary>
+
+![help](https://raw.githubusercontent.com/lgc-NB2Dev/readme/main/meme-stickers/QQ20250224-010418.png)
+![help](https://raw.githubusercontent.com/lgc-NB2Dev/readme/main/meme-stickers/QQ20250224-010559.png)
+
+</details>
 
 ## 💿 安装
 
@@ -119,23 +161,40 @@ plugins = [
 
 在 nonebot2 项目的 `.env` 文件中添加下表中的必填配置
 
-|  配置项  | 必填 | 默认值 |   说明   |
-| :------: | :--: | :----: | :------: |
-| 配置项 1 |  是  |   无   | 配置说明 |
-| 配置项 2 |  否  |   无   | 配置说明 |
+|                    配置项                    | 必填 |                                                           默认值                                                           |                                                                                            说明                                                                                             |
+| :------------------------------------------: | :--: | :------------------------------------------------------------------------------------------------------------------------: | :-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------: |
+|                   `PROXY`                    |  否  |                                                             无                                                             |                                                                                 插件网络请求使用的代理地址                                                                                  |
+|           `MEME_STICKERS_DATA_DIR`           |  否  |                                                   `./data/meme_stickers`                                                   |                                                                                                                                                                                             |
+|     `MEME_STICKERS_GITHUB_URL_TEMPLATE`      |  否  | [`...`](https://github.com/lgc-NB2Dev/nonebot-plugin-meme-stickers/blob/master/nonebot_plugin_meme_stickers/config.py#L67) | 插件请求 GitHub 源时使用的链接模板，可用变量参考 [这里](https://github.com/lgc-NB2Dev/nonebot-plugin-meme-stickers/blob/master/nonebot_plugin_meme_stickers/utils/file_source.py#L115-L125) |
+|         `MEME_STICKERS_RETRY_TIMES`          |  否  |                                                            `3`                                                             |                                                                                 插件每个网络请求的重试次数                                                                                  |
+|       `MEME_STICKERS_REQ_CONCURRENCY`        |  否  |                                                            `8`                                                             |                                                                                 插件下载贴纸时的并行请求数                                                                                  |
+|         `MEME_STICKERS_REQ_TIMEOUT`          |  否  |                                                            `5`                                                             |                                                                                   插件网络请求超时（秒）                                                                                    |
+|         `MEME_STICKERS_AUTO_UPDATE`          |  否  |                                                           `True`                                                           |                                                                               是否在启动时自动更新一遍贴纸包                                                                                |
+|         `MEME_STICKERS_FORCE_UPDATE`         |  否  |                                                          `False`                                                           |                                                                    在启用自动更新贴纸包时，控制自动更新是否执行强制更新                                                                     |
+|        `MEME_STICKERS_PROMPT_RETRIES`        |  否  |                                                            `3`                                                             |                                                                        交互模式时输入非法后连续询问的最高次数（秒）                                                                         |
+|        `MEME_STICKERS_PROMPT_TIMEOUT`        |  否  |                                                            `30`                                                            |                                                                             交互模式时每次询问的超时时间（秒）                                                                              |
+|  `MEME_STICKERS_DEFAULT_STICKER_BACKGROUND`  |  否  |                                                          `FFFFFF`                                                          |                                                                           当图片格式为 `jpeg` 时，默认的背景底色                                                                            |
+| `MEME_STICKERS_DEFAULT_STICKER_IMAGE_FORMAT` |  否  |                                                           `png`                                                            |                                                                                生成贴纸时默认使用的图片格式                                                                                 |
 
 ## 🎉 使用
 
-### 指令表
+发送 `meme-stickers` 指令获取使用帮助吧！
 
-|  指令  | 权限 | 需要@ | 范围 |   说明   |
-| :----: | :--: | :---: | :--: | :------: |
-| 指令 1 | 主人 |  否   | 私聊 | 指令说明 |
-| 指令 2 | 群员 |  是   | 群聊 | 指令说明 |
+<details>
 
-### 效果图
+<summary>指令帮助（点击展开）</summary>
 
-如果有效果图的话
+> [!NOTE]
+> 以下内容仅供参考，实际内容请以 `meme-stickers` 输出为准
+
+![help](https://raw.githubusercontent.com/lgc-NB2Dev/readme/main/meme-stickers/help.jpg)
+
+</details>
+
+## 🏆 贡献
+
+如果你想制作自定义贴纸包，请参考 [meme-stickers-hub](https://github.com/lgc-NB2Dev/meme-stickers-hub)  
+也欢迎把你的贴纸包贡献给我们~
 
 ## 📞 联系
 
@@ -146,7 +205,9 @@ Telegram：[@lgc2333](https://t.me/lgc2333)
 
 ## 💡 鸣谢
 
-如果有要鸣谢的人的话
+### [MeetWq](https://github.com/MeetWq)
+
+- 从 [pil-utils](https://github.com/MemeCrafters/pil-utils) 抄过来的 skia 文本绘制
 
 ## 💰 赞助
 

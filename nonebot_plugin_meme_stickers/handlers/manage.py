@@ -173,7 +173,7 @@ async def _(
 alc.subcommand(
     "update",
     Args(
-        Arg("packs", MultiVar(str, "+"), notice="要更新的贴纸包 ID / 代号 / 名称"),
+        Arg("packs?", MultiVar(str, "+"), notice="要更新的贴纸包 ID / 代号 / 名称"),
     ),
     Option(
         "-a|--all",

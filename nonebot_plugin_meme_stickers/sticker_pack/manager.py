@@ -142,7 +142,7 @@ class StickerPackManager:
         return pack, res
 
     async def update_all(self, force: bool = False, **req_kw: Unpack[ReqKwargs]):
-        return await update_packs(self.available_packs, force=force, **req_kw)
+        return await update_packs(self.packs, force=force, **req_kw)
 
 
 async def update_packs(
@@ -160,6 +160,10 @@ async def update_packs(
 
         try:
             r = await p.update(force=force, **req_kw)
+        except NotImplementedError:
+            op_info.skipped.append(OpIt(p, "无更新源"))
+            logger.warning(f"Pack `{p.slug}` has no update source, skip")
+            return None
         except Exception as e:
             op_info.failed.append(OpIt(p, exc=e))
             with warning_suppress(f"Failed to update pack `{p.slug}`"):

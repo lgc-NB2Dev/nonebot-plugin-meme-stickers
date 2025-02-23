@@ -11,6 +11,7 @@ from ..sticker_pack.models import StickerParams, zoom_sticker
 from .sticker import make_sticker_picture_from_params
 from .tools import (
     DEFAULT_BACKGROUND_COLOR,
+    DEFAULT_TEXT_COLOR,
     FALLBACK_SYSTEM_FONTS,
     get_black_n_white_filter_paint,
     get_resize_contain_ratio_size_offset,
@@ -22,7 +23,7 @@ from .tools import (
 
 DEFAULT_CARD_BACKGROUND_COLOR = 0xFF404754
 DEFAULT_CARD_BORDER_COLOR = 0xFF3E4452
-DEFAULT_CARD_TEXT_COLOR = 0xFFD7DAE0
+DEFAULT_CARD_TEXT_COLOR = DEFAULT_TEXT_COLOR
 DEFAULT_CARD_SUB_TEXT_COLOR = 0xFFABB2BF
 
 DEFAULT_CARD_DISABLED_BACKGROUND_COLOR = 0xFF30333D

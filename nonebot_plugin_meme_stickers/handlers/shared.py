@@ -8,7 +8,7 @@ from cookit.pyd import model_copy
 from nonebot import logger
 from nonebot.adapters import Message as BaseMessage
 from nonebot.exception import NoneBotException
-from nonebot_plugin_alconna import AlconnaMatcher, UniMessage, on_alconna
+from nonebot_plugin_alconna import UniMessage, on_alconna
 from nonebot_plugin_waiter import prompt
 
 from ..config import config
@@ -36,13 +36,6 @@ m_cls = on_alconna(
     use_cmd_start=True,
     # use_cmd_sep=True,
 )
-
-
-# fallback help
-@m_cls.assign("$main")
-async def _(m: AlconnaMatcher):
-    await m.finish(alc.get_help())
-
 
 EXIT_COMMANDS = ("0", "e", "exit", "q", "quit", "取消", "退出")
 COMMON_COMMANDS_TIP = "另外可以回复 0 来退出"

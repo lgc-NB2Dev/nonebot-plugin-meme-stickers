@@ -78,6 +78,7 @@ def create_client(**kwargs):
         **{
             "proxy": config.proxy,
             "follow_redirects": True,
+            "timeout": config.req_timeout,
             **kwargs,
         },
     )
