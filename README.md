@@ -14,7 +14,7 @@
 
 _✨ 一站式制作 PJSK 样式表情包 ✨_
 
-<img src="https://img.shields.io/badge/python-3.10+-blue.svg" alt="python">
+<img src="https://img.shields.io/badge/python-3.9+-blue.svg" alt="python">
 <a href="https://pdm.fming.dev">
   <img src="https://img.shields.io/badge/pdm-managed-blueviolet" alt="pdm-managed">
 </a>
@@ -164,7 +164,7 @@ plugins = [
 |                    配置项                    | 必填 |                                                           默认值                                                           |                                                                                            说明                                                                                             |
 | :------------------------------------------: | :--: | :------------------------------------------------------------------------------------------------------------------------: | :-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------: |
 |                   `PROXY`                    |  否  |                                                             无                                                             |                                                                                 插件网络请求使用的代理地址                                                                                  |
-|           `MEME_STICKERS_DATA_DIR`           |  否  |                                                   `./data/meme_stickers`                                                   |                                                                                                                                                                                             |
+|           `MEME_STICKERS_DATA_DIR`           |  否  |                                                   `./data/meme_stickers`                                                   |                                                                                     插件数据存放的位置                                                                                      |
 |     `MEME_STICKERS_GITHUB_URL_TEMPLATE`      |  否  | [`...`](https://github.com/lgc-NB2Dev/nonebot-plugin-meme-stickers/blob/master/nonebot_plugin_meme_stickers/config.py#L67) | 插件请求 GitHub 源时使用的链接模板，可用变量参考 [这里](https://github.com/lgc-NB2Dev/nonebot-plugin-meme-stickers/blob/master/nonebot_plugin_meme_stickers/utils/file_source.py#L115-L125) |
 |         `MEME_STICKERS_RETRY_TIMES`          |  否  |                                                            `3`                                                             |                                                                                 插件每个网络请求的重试次数                                                                                  |
 |       `MEME_STICKERS_REQ_CONCURRENCY`        |  否  |                                                            `8`                                                             |                                                                                 插件下载贴纸时的并行请求数                                                                                  |
