@@ -217,4 +217,6 @@ Telegram：[@lgc2333](https://t.me/lgc2333)
 
 ## 📝 更新日志
 
-芝士刚刚发布的插件，还没有更新日志的说 qwq~
+### 0.1.1
+
+- 向 `nb-cli` 添加 `stickers-gen-checksum` 脚本，用于在数据目录的所有贴纸包下生成 `checksum.json`
