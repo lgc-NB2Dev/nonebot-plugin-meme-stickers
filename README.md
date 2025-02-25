@@ -217,6 +217,10 @@ Telegram：[@lgc2333](https://t.me/lgc2333)
 
 ## 📝 更新日志
 
+### 0.1.2
+
+- 兼容 `localstore` 插件，当 Bot 工作目录下不存在 `data` 文件夹且 `localstore` 插件可用时使用 `localstore` 获取插件数据存储路径
+
 ### 0.1.1
 
 - 向 `nb-cli` 添加 `stickers-gen-checksum` 脚本，用于在数据目录的所有贴纸包下生成 `checksum.json`
