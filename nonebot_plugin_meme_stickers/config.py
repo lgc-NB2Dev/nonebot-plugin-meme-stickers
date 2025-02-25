@@ -1,9 +1,10 @@
+import importlib
 import re
 from pathlib import Path
 from typing import Optional, cast
 
 from cookit.pyd import field_validator, get_alias_model
-from nonebot import get_plugin_config
+from nonebot import get_plugin_config, logger
 from pydantic import Field
 
 from .consts import (
@@ -55,13 +56,25 @@ def resolve_color_to_tuple(color: str) -> RGBAColorTuple:
     )
 
 
+def get_default_data_path() -> Path:
+    if (not (Path.cwd() / "data").exists()) and importlib.find_loader(
+        "nonebot_plugin_localstore",
+    ):
+        from nonebot_plugin_localstore import get_data_dir
+
+        return get_data_dir("nonebot_plugin_meme_stickers")
+
+    logger.debug("Using legacy data path")
+    return Path.cwd() / "data" / "meme_stickers"
+
+
 BaseConfigModel = get_alias_model(lambda x: f"meme_stickers_{x}")
 
 
 class ConfigModel(BaseConfigModel):
     proxy: Optional[str] = Field(None, alias="proxy")
 
-    data_dir: Path = Path("./data/meme_stickers")
+    data_dir: Path = Field(default_factory=get_default_data_path)
 
     github_url_template: str = (
         "https://raw.githubusercontent.com/{owner}/{repo}/{ref_path}/{path}"

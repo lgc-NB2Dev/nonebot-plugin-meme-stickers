@@ -22,6 +22,9 @@ stickers-gen-checksum = "nonebot_plugin_meme_stickers.scripts.gen_checksum:main"
 [project.urls]
 homepage = "https://github.com/lgc-NB2Dev/nonebot-plugin-meme-stickers"
 
+[project.optional-dependencies]
+localstore = ["nonebot-plugin-localstore>=0.7.3"]
+
 [build-system]
 requires = ["pdm-backend"]
 build-backend = "pdm.backend"
