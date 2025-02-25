@@ -1,10 +1,10 @@
-import importlib
 import re
+from importlib.util import find_spec
 from pathlib import Path
 from typing import Optional, cast
 
 from cookit.pyd import field_validator, get_alias_model
-from nonebot import get_plugin_config, logger
+from nonebot import get_plugin_config, logger, require
 from pydantic import Field
 
 from .consts import (
@@ -57,9 +57,9 @@ def resolve_color_to_tuple(color: str) -> RGBAColorTuple:
 
 
 def get_default_data_path() -> Path:
-    if (not (Path.cwd() / "data").exists()) and importlib.find_loader(
-        "nonebot_plugin_localstore",
-    ):
+    if (not (Path.cwd() / "data").exists()) and find_spec("nonebot_plugin_localstore"):
+        require("nonebot_plugin_localstore")
+
         from nonebot_plugin_localstore import get_data_dir
 
         return get_data_dir("nonebot_plugin_meme_stickers")
