@@ -3,13 +3,14 @@ from pathlib import Path
 from typing import Any, Callable, Optional, TypeVar, Union
 from typing_extensions import TypeAlias, Unpack
 
+from cookit import nullcontext
 from cookit.loguru import warning_suppress
 from nonebot import logger
 
 from ..consts import MANIFEST_FILENAME, UPDATING_FLAG_FILENAME
-from ..utils.file_source import FileSource, ReqKwargs
+from ..utils.file_source import ReqKwargs, create_req_sem
 from ..utils.operation import OpInfo, OpIt
-from .models import StickerPackManifest
+from .models import HubStickerPackInfo, StickerPackManifest
 from .pack import StickerPack
 from .update import UpdatedResourcesInfo, update_sticker_pack
 
@@ -43,8 +44,9 @@ class StickerPackManager:
         return func
 
     def wrapped_call_callbacks(self, pack: StickerPack) -> None:
-        if pack.deleted:
+        if pack.ref_outdated or pack.deleted:
             self.packs.remove(pack)
+            logger.debug(f"Unloaded pack `{pack.slug}`")
         for cb in self.state_change_callbacks:
             cb(self, pack)
 
@@ -60,13 +62,13 @@ class StickerPackManager:
             state_change_callbacks=[self.wrapped_call_callbacks],
         )
         self.packs.append(p)
+        logger.debug(f"Loaded pack `{slug}`")
         return p
 
     def reload(self, clear_updating_flags: bool = False):
         logger.debug("Unloading packs")
-        for x in self.packs:
+        for x in self.packs.copy():
             x.set_ref_outdated()
-        self.packs.clear()
 
         op_info = OpInfo[Union[str, StickerPack]]()
 
@@ -79,7 +81,11 @@ class StickerPackManager:
         slugs = (
             x.name
             for x in self.base_path.iterdir()
-            if x.is_dir() and (x / MANIFEST_FILENAME).exists()
+            if (
+                x.is_dir()
+                and (not x.name.startswith("_"))
+                and (x / MANIFEST_FILENAME).exists()
+            )
         )
         for slug in slugs:
             try:
@@ -90,7 +96,6 @@ class StickerPackManager:
                     raise
             else:
                 op_info.succeed.append(OpIt(p))
-                logger.debug(f"Successfully loaded pack `{slug}`")
 
         logger.success(f"Successfully loaded {len(self.packs)} packs")
         return op_info
@@ -129,17 +134,42 @@ class StickerPackManager:
 
     async def install(
         self,
-        slug: str,
-        source: FileSource,
+        infos: list[HubStickerPackInfo],
         manifest: Optional[StickerPackManifest] = None,
         **req_kw: Unpack[ReqKwargs],
-    ) -> tuple[StickerPack, UpdatedResourcesInfo]:
-        if self.find_pack_by_slug(slug):
-            raise ValueError(f"Pack `{slug}` already loaded")
-        pack_path = self.base_path / slug
-        res = await update_sticker_pack(pack_path, source, manifest, **req_kw)
-        pack = self.load_pack(slug)
-        return pack, res
+    ) -> tuple[OpInfo[Union[StickerPack, str]], dict[str, UpdatedResourcesInfo]]:
+        if p := next((self.find_pack_by_slug(x.slug) for x in infos), None):
+            raise ValueError(f"Pack `{p.slug}` already loaded")
+
+        op_info = OpInfo[Union[StickerPack, str]]()
+
+        async def do_install(info: HubStickerPackInfo):
+            pack_path = self.base_path / info.slug
+            try:
+                res = await update_sticker_pack(
+                    pack_path,
+                    info.source,
+                    manifest,
+                    **req_kw,
+                )
+                pack = self.load_pack(info.slug)
+            except Exception as e:
+                op_info.failed.append(OpIt(info.slug, exc=e))
+                with warning_suppress(f"Failed to install pack `{info.slug}`"):
+                    raise
+            else:
+                op_info.succeed.append(OpIt(pack))
+            return res
+
+        # restrict install concurrency **counted by packs**
+        sem = nullcontext() if req_kw.get("sem") else create_req_sem()
+
+        async def with_sem_install(info: HubStickerPackInfo):
+            async with sem:
+                return await do_install(info)
+
+        res = await asyncio.gather(*(with_sem_install(x) for x in infos))
+        return op_info, {p.slug: v for p, v in zip(infos, res)}
 
     async def update_all(self, force: bool = False, **req_kw: Unpack[ReqKwargs]):
         return await update_packs(self.packs, force=force, **req_kw)
@@ -153,6 +183,11 @@ async def update_packs(
     op_info = OpInfo[StickerPack]()
 
     async def update(p: StickerPack):
+        if p.deleted:
+            p.set_ref_outdated()
+            logger.warning(f"Found loaded pack `{p.slug}` has been manually deleted!!!")
+            return None
+
         if p.updating:
             op_info.skipped.append(OpIt(p, "已在更新中"))
             logger.warning(f"Pack `{p.slug}` is updating, skip")
@@ -175,6 +210,13 @@ async def update_packs(
                 op_info.skipped.append(OpIt(p, "无须更新"))
             return r
 
-    res = await asyncio.gather(*(update(p) for p in packs))
+    # restrict update concurrency **counted by packs**
+    sem = nullcontext() if req_kw.get("sem") else create_req_sem()
+
+    async def with_sem_update(p: StickerPack):
+        async with sem:
+            return await update(p)
+
+    res = await asyncio.gather(*(with_sem_update(p) for p in packs.copy()))
     updated_info = {p.slug: v for p, v in zip(packs, res) if v}
     return op_info, updated_info

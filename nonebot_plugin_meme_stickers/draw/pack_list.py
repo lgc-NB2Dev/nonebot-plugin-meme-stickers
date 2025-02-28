@@ -160,7 +160,7 @@ def draw_sticker_pack_grid(params: list[StickerPackCardParams]):
         chunks(tuple(zip(cards, rectangles, params)), DEFAULT_CARD_GRID_COLS),
     )
 
-    card_w = max(x[1].width() for x in splitted_cards[0])
+    card_w = max(x.width() for x in rectangles)
     card_lines_h = [max(x[1].height() for x in row) for row in splitted_cards]
 
     first_line_len = len(splitted_cards[0])

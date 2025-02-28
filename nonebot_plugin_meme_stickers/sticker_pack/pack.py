@@ -10,7 +10,7 @@ from nonebot import logger
 
 from ..consts import CONFIG_FILENAME, MANIFEST_FILENAME, UPDATING_FLAG_FILENAME
 from ..utils import dump_readable_model
-from ..utils.file_source import ReqKwargs, create_client, create_req_sem
+from ..utils.file_source import ReqKwargs
 from ..utils.operation import op_val_formatter
 from .hub import fetch_manifest
 from .models import HubStickerPackInfo, StickerPackConfig, StickerPackManifest
@@ -67,6 +67,7 @@ class StickerPack:
 
     @property
     def ref_outdated(self) -> bool:
+        """If this pack's ref is outdated, anything shouldn't use this instance"""
         return self._ref_outdated
 
     @property
@@ -90,6 +91,7 @@ class StickerPack:
         return None
 
     def set_ref_outdated(self, notify: bool = True):
+        """Set this will tell related pack manager (if there is) to unload it"""
         self._ref_outdated = True
         if notify:
             self.call_callbacks()
@@ -176,11 +178,6 @@ class StickerPack:
         s = self.merged_config.update_source
         if not s:
             raise NotImplementedError("This pack has no update source")
-
-        if "cli" not in req_kw:
-            req_kw["cli"] = create_client()
-        if "sem" not in req_kw:
-            req_kw["sem"] = create_req_sem()
 
         if not manifest:
             manifest = await fetch_manifest(s, **req_kw)

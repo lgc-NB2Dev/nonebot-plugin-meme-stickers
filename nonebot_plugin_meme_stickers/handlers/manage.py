@@ -1,5 +1,5 @@
 import asyncio
-from typing import Optional, Union
+from typing import Optional
 
 import skia
 from arclet.alconna import Arg, Args, MultiVar, Option, store_true
@@ -149,24 +149,12 @@ async def _(
     if not_founds:
         await m.finish(f"以下贴纸包不存在：\n{', '.join(f'`{x}`' for x in not_founds)}")
 
-    op = OpInfo[Union[StickerPack, str]]()
-    updated_res: dict[str, UpdatedResourcesInfo] = {}
-
-    async def install(info: HubStickerPackInfo):
-        try:
-            pack, r = await pack_manager.install(info.slug, info.source)
-        except Exception as e:
-            logger.exception(f"Failed to install pack {info.slug}")
-            op.failed.append(OpIt(info.slug, exc=e))
-        else:
-            op.succeed.append(OpIt(pack))
-            updated_res[info.slug] = r
-
     async with RecallContext() as ctx:
         await ctx.send("正在下载贴纸包，请稍候")
-        await asyncio.gather(*(install(x) for x in infos))
+        op_info, updated_res = await pack_manager.install(infos)
     await m.finish(
-        f"贴纸包安装结果：\n{format_op(op)}{format_external_fonts_tip(updated_res)}",
+        f"贴纸包安装结果："
+        f"\n{format_op(op_info)}{format_external_fonts_tip(updated_res)}",
     )
 
 

@@ -3,7 +3,7 @@ import json
 from pathlib import Path
 from typing import TypeVar
 
-from cookit.common.other import copy_func_arg_annotations
+from cookit import copy_func_arg_annotations
 from cookit.pyd import type_dump_python
 from nonebot import logger
 from tenacity import RetryCallState, retry, stop_after_attempt, wait_fixed

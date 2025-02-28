@@ -7,7 +7,7 @@ from tempfile import TemporaryDirectory
 from typing import Any, Callable, Optional
 from typing_extensions import Unpack
 
-from cookit.pyd.compat import type_validate_json
+from cookit.pyd import type_validate_json
 from nonebot import logger
 
 from ..consts import CONFIG_FILENAME, MANIFEST_FILENAME, UPDATING_FLAG_FILENAME
@@ -15,9 +15,9 @@ from ..utils import calc_checksum_from_file, dump_readable_model
 from ..utils.file_source import (
     FileSource,
     ReqKwargs,
-    create_client,
-    create_req_sem,
     fetch_source,
+    with_kw_cli,
+    with_kw_sem,
 )
 from .hub import fetch_manifest, fetch_optional_checksum
 from .models import StickerPackConfig, StickerPackManifest
@@ -77,9 +77,6 @@ async def update_sticker_pack(
     if (pack_path / UPDATING_FLAG_FILENAME).exists():
         raise RuntimeError(f"Pack `{slug}` is updating")
 
-    if "cli" not in req_kw:
-        req_kw["cli"] = create_client()
-
     if manifest is None:
         logger.debug(f"Fetching manifest of pack `{slug}`")
         manifest = await fetch_manifest(source, **req_kw)
@@ -88,19 +85,30 @@ async def update_sticker_pack(
     checksum = await fetch_optional_checksum(source, **req_kw)
 
     logger.debug(f"Collecting files need to update for pack `{slug}`")
-    local_files = collect_local_files(pack_path) if pack_path.exists() else []
-    remote_files = collect_manifest_files(manifest)
 
     # collect files should be downloaded
-    local_files_set = set(local_files)
-    remote_files_set = set(remote_files)
+    local_files = (
+        set(collect_local_files(pack_path)) if pack_path.exists() else set[str]()
+    )
+    remote_files = set(collect_manifest_files(manifest))
 
-    # 1. files that are not exist in local
-    files_should_download = remote_files_set - local_files_set
+    # 1. files that are not exist in local pack folder
+    files_should_download = remote_files - local_files
 
-    # 2. files both exists in local and remote,
+    # 2. files not in local pack folder, but remote exists. (shared files)
+    #    if these files exist in local, remove them from files_should_download
+    exist_files_not_in_pack_dir = {
+        x for x in files_should_download if (pack_path / x).exists()
+    }
+    files_should_download -= exist_files_not_in_pack_dir
+
+    # 3. files both exists in local and remote,
     #    but checksum not match, or not exist in remote checksum
-    file_both_exist = set(local_files) & set(remote_files)
+    file_both_exist = (
+        # avoid editing local_files set
+        # to avoid accidentally remove shared files using by other packs in next step
+        {*local_files, *exist_files_not_in_pack_dir} & remote_files
+    )
     if checksum:
         both_exist_checksum = {
             x: calc_checksum_from_file(pack_path / x) for x in file_both_exist
@@ -153,7 +161,7 @@ async def update_sticker_pack(
 
     def after_ops():
         # collect files should remove from local
-        files_should_remove = local_files_set - remote_files_set
+        files_should_remove = local_files - remote_files
         if files_should_remove:
             logger.info(
                 f"Removing {len(files_should_remove)} not needed files from pack `{slug}`",
@@ -200,11 +208,10 @@ async def update_sticker_pack(
                 f" collected {download_total} files will update from remote,"
                 f" downloading to temp dir",
             )
-            if "sem" not in req_kw:
-                req_kw["sem"] = create_req_sem()
-            await asyncio.gather(
-                *(download(tmp_dir, x) for x in files_should_download),
-            )
+            async with with_kw_cli(req_kw), with_kw_sem(req_kw):
+                await asyncio.gather(
+                    *(download(tmp_dir, x) for x in files_should_download),
+                )
         else:
             logger.info(f"No files need to update for pack `{slug}`")
 

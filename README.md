@@ -167,7 +167,7 @@ plugins = [
 |           `MEME_STICKERS_DATA_DIR`           |  否  |                                                   `./data/meme_stickers`                                                   |                                                                                     插件数据存放的位置                                                                                      |
 |     `MEME_STICKERS_GITHUB_URL_TEMPLATE`      |  否  | [`...`](https://github.com/lgc-NB2Dev/nonebot-plugin-meme-stickers/blob/master/nonebot_plugin_meme_stickers/config.py#L67) | 插件请求 GitHub 源时使用的链接模板，可用变量参考 [这里](https://github.com/lgc-NB2Dev/nonebot-plugin-meme-stickers/blob/master/nonebot_plugin_meme_stickers/utils/file_source.py#L115-L125) |
 |         `MEME_STICKERS_RETRY_TIMES`          |  否  |                                                            `3`                                                             |                                                                                 插件每个网络请求的重试次数                                                                                  |
-|       `MEME_STICKERS_REQ_CONCURRENCY`        |  否  |                                                            `8`                                                             |                                                                                 插件下载贴纸时的并行请求数                                                                                  |
+|       `MEME_STICKERS_REQ_CONCURRENCY`        |  否  |                                                            `8`                                                             |                                                                             插件进行批量网络请求时每批的并行数                                                                              |
 |         `MEME_STICKERS_REQ_TIMEOUT`          |  否  |                                                            `5`                                                             |                                                                                   插件网络请求超时（秒）                                                                                    |
 |         `MEME_STICKERS_AUTO_UPDATE`          |  否  |                                                           `True`                                                           |                                                                               是否在启动时自动更新一遍贴纸包                                                                                |
 |         `MEME_STICKERS_FORCE_UPDATE`         |  否  |                                                          `False`                                                           |                                                                    在启用自动更新贴纸包时，控制自动更新是否执行强制更新                                                                     |
@@ -216,6 +216,15 @@ Telegram：[@lgc2333](https://t.me/lgc2333)
 感谢大家的赞助！你们的赞助将是我继续创作的动力！
 
 ## 📝 更新日志
+
+### 0.2.0
+
+- 小幅代码重构，修复了一些潜在 Bug
+- 修复贴纸包列表卡片宽度不正确的问题
+- 贴纸包现在支持使用与更新不在贴纸包文件夹内的文件了，  
+  此功能设计初衷是如果各贴纸包有共享资源，可以将资源放在贴纸包文件夹外，以减少重复资源占用的空间，  
+  缺点是如果有被贴纸包弃用的资源不会被自动删除，
+  请各位合理使用此特性
 
 ### 0.1.2
 

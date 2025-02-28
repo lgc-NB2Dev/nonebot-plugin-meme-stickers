@@ -13,9 +13,9 @@ from ..utils.file_source import (
     FileSource,
     FileSourceGitHubBranch,
     ReqKwargs,
-    create_req_sem,
     fetch_github_source,
     fetch_source,
+    with_kw_sem,
 )
 from .models import ChecksumDict, HubManifest, HubStickerPackInfo, StickerPackManifest
 
@@ -75,14 +75,12 @@ async def fetch_optional_checksum(
 async def fetch_hub_and_packs(
     **req_kw: Unpack[ReqKwargs],
 ) -> tuple[HubManifest, dict[str, StickerPackManifest]]:
-    if "sem" not in req_kw:
-        req_kw["sem"] = create_req_sem()
-
     hub = await fetch_hub(**req_kw)
 
-    packs = await asyncio.gather(
-        *(fetch_optional_manifest(x.source, **req_kw) for x in hub),
-    )
+    async with with_kw_sem(req_kw):
+        packs = await asyncio.gather(
+            *(fetch_optional_manifest(x.source, **req_kw) for x in hub),
+        )
     packs_dict = {h.slug: p for h, p in zip(hub, packs) if p is not None}
     return hub, packs_dict
 
@@ -94,9 +92,6 @@ async def temp_sticker_card_params(
     checksums: Optional[dict[str, ChecksumDict]] = None,
     **req_kw: Unpack[ReqKwargs],
 ) -> list[StickerPackCardParams]:
-    if "sem" not in req_kw:
-        req_kw["sem"] = create_req_sem()
-
     async def task(i: int, info: HubStickerPackInfo):
         manifest = manifests[info.slug]
         sticker = model_copy(manifest.resolved_sample_sticker)
@@ -106,7 +101,7 @@ async def temp_sticker_card_params(
         )
         if (not sticker_hash) or (not (cache_dir / sticker_hash).exists()):
             cache_dir.mkdir(parents=True, exist_ok=True)
-            resp = await fetch_source(info.source, sticker.base_image)
+            resp = await fetch_source(info.source, sticker.base_image, **req_kw)
             if not sticker_hash:
                 sticker_hash = calc_checksum(resp.content)
             (cache_dir / sticker_hash).write_bytes(resp.content)
@@ -121,4 +116,5 @@ async def temp_sticker_card_params(
             index=str(i),
         )
 
-    return await asyncio.gather(*(task(i, x) for i, x in enumerate(hub, 1)))
+    async with with_kw_sem(req_kw):
+        return await asyncio.gather(*(task(i, x) for i, x in enumerate(hub, 1)))

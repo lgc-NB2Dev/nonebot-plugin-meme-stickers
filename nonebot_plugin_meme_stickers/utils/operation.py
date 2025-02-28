@@ -67,4 +67,4 @@ def format_op(op: OpInfo[Any]):
     if op.failed:
         txt.append(f"失败 ({len(op.failed)} 个)：")
         txt.extend(f"  - {format_op_it(it)}" for it in op.failed)
-    return "\n".join(txt)
+    return "\n".join(txt) if txt else "没有执行任何操作"

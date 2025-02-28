@@ -1,5 +1,6 @@
 import asyncio
 from collections.abc import Awaitable
+from contextlib import asynccontextmanager
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -84,11 +85,49 @@ def create_client(**kwargs):
     )
 
 
-source_fetcher = TypeDecoCollector[FileSource, SourceFetcher[Any]]()
-
-
 def create_req_sem():
     return asyncio.Semaphore(config.req_concurrency)
+
+
+@asynccontextmanager
+async def with_cli(cli: Optional[AsyncClient] = None):
+    ctx = create_client() if cli is None else nullcontext(cli)
+    async with ctx as x:
+        yield x
+
+
+@asynccontextmanager
+async def with_kw_cli(kw: ReqKwargs):
+    # if no cli provided, create a temp one and manage it
+    cli = kw.get("cli")
+    if cli:
+        yield
+        return
+
+    cli = create_client()
+    kw["cli"] = cli
+    try:
+        async with cli:
+            yield
+    finally:
+        kw.pop("cli")
+
+
+@asynccontextmanager
+async def with_kw_sem(kw: ReqKwargs):
+    # if sem not in kw, create one
+    sem = kw.get("sem")
+    if not sem:
+        sem = create_req_sem()
+        kw["sem"] = sem
+    try:
+        yield
+    finally:
+        if "sem" in kw:
+            kw.pop("sem")
+
+
+source_fetcher = TypeDecoCollector[FileSource, SourceFetcher[Any]]()
 
 
 @source_fetcher(FileSourceURL)
@@ -105,9 +144,8 @@ async def fetch_url_source(
     async def fetch(cli: AsyncClient) -> "Response":
         return (await cli.get(url)).raise_for_status()
 
-    ctx = create_client() if cli is None else nullcontext(cli)
     sem = sem or nullcontext()
-    async with sem, ctx as ctx_cli:
+    async with sem, with_cli(cli) as ctx_cli:
         return await fetch(ctx_cli)
 
 
