@@ -4,7 +4,7 @@ from typing import Optional, cast
 from cookit.nonebot.localstore import ensure_localstore_path_config
 from cookit.pyd import field_validator, get_alias_model
 from nonebot import get_plugin_config
-from nonebot_plugin_localstore import get_data_dir
+from nonebot_plugin_localstore import get_plugin_data_dir
 from pydantic import Field
 
 from .consts import (
@@ -87,4 +87,4 @@ config: ConfigModel = get_plugin_config(ConfigModel)
 
 
 ensure_localstore_path_config()
-data_dir = get_data_dir("meme_stickers")
+data_dir = get_plugin_data_dir()

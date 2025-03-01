@@ -15,7 +15,7 @@ from .handlers import load_handlers
 from .sticker_pack import pack_manager
 from .utils.operation import format_op
 
-__version__ = "0.2.1"
+__version__ = "0.2.1.post1"
 __plugin_meta__ = PluginMetadata(
     name=NAME,
     description=DESCRIPTION,
