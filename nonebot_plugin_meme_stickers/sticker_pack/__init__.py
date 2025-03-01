@@ -1,4 +1,4 @@
-from ..config import config
+from ..config import data_dir
 from .manager import StickerPackManager
 
-pack_manager = StickerPackManager(config.data_dir)
+pack_manager = StickerPackManager(data_dir)

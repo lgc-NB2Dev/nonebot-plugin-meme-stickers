@@ -7,6 +7,7 @@ from nonebot.plugin import PluginMetadata, inherit_supported_adapters, require
 
 require("nonebot_plugin_alconna")
 require("nonebot_plugin_waiter")
+require("nonebot_plugin_localstore")
 
 from .config import ConfigModel, config
 from .consts import AUTHOR, DESCRIPTION, NAME
@@ -14,7 +15,7 @@ from .handlers import load_handlers
 from .sticker_pack import pack_manager
 from .utils.operation import format_op
 
-__version__ = "0.2.0"
+__version__ = "0.2.1"
 __plugin_meta__ = PluginMetadata(
     name=NAME,
     description=DESCRIPTION,
