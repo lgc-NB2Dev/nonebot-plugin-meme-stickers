@@ -1,7 +1,8 @@
+from asyncio import InvalidStateError
 from contextlib import contextmanager, suppress
 from textwrap import indent
 from typing import Any, Optional, TypeVar, Union
-from typing_extensions import Self, TypeAlias
+from typing_extensions import TypeAlias
 
 from cookit import deep_merge
 from cookit.pyd import (
@@ -10,7 +11,7 @@ from cookit.pyd import (
     type_dump_python,
     type_validate_python,
 )
-from pydantic import BaseModel, PrivateAttr, ValidationError
+from pydantic import BaseModel, ValidationError
 
 from ..consts import (
     RGBAColorTuple,
@@ -26,10 +27,10 @@ from ..utils.file_source import FileSource
 T = TypeVar("T")
 
 
-def validate_not_falsy(cls: BaseModel, value: T) -> T:  # noqa: ARG001
-    if not value:
+def validate_not_falsy(v: T) -> T:  # noqa: ARG001
+    if not v:
         raise ValueError("value cannot be empty")
-    return value
+    return v
 
 
 @contextmanager
@@ -80,7 +81,10 @@ class StickerInfoOptionalParams(BaseModel):
     category: str
     params: StickerParamsOptional
 
-    _validate_not_falsy = field_validator("name", "category")(validate_not_falsy)
+    @field_validator("name", "category")
+    @classmethod
+    def _validate_not_falsy(cls, v: str) -> str:
+        return validate_not_falsy(v)
 
 
 class StickerInfo(BaseModel):
@@ -109,10 +113,21 @@ class StickerGridParams(BaseModel):
     sticker_size_fixed: Optional[tuple[int, int]] = None
 
     @model_validator(mode="after")
-    def validate_rows_cols(self):
-        if (self.rows and self.cols) or ((self.rows is None) and (self.cols is None)):
-            raise ValueError("Either rows or cols must be None")
-        return self
+    def _validate_rows_cols(cls, values: dict[str, Any]) -> dict[str, Any]:  # noqa: N805
+        rows_exists = "rows" in values
+        cols_exists = "cols" in values
+        if rows_exists and not cols_exists:
+            values["cols"] = None
+        rows_have_no_val: Optional[int] = values.get("rows") is None
+        cols_have_no_val: Optional[int] = values.get("cols", 5) is None
+        if (rows_have_no_val and cols_have_no_val) or (
+            (not rows_have_no_val) and (not cols_have_no_val)
+        ):
+            raise ValueError(
+                "Either the 'rows' or the 'cols' parameter must be specified"
+                ", but not both.",
+            )
+        return values
 
     @property
     def resolved_padding(self) -> TRBLPaddingTuple:
@@ -140,42 +155,50 @@ class StickerGridSetting(BaseModel):
     category_override_params: StickerGridParams = StickerGridParams()
     stickers_override_params: dict[str, StickerGridParams] = {}
 
-    _resolved_category_params: StickerGridParams = PrivateAttr(StickerGridParams())
-    _resolved_stickers_params: dict[str, StickerGridParams] = PrivateAttr({})
-
-    @property
-    def resolved_category_params(self) -> StickerGridParams:
-        return self._resolved_category_params
-
-    @property
-    def resolved_stickers_params(self) -> dict[str, StickerGridParams]:
-        return self._resolved_stickers_params
+    resolved_category_params: StickerGridParams = StickerGridParams()
+    resolved_stickers_params: dict[str, StickerGridParams] = {}
 
     @model_validator(mode="after")
-    def validate_resolve_overrides(self) -> Self:
-        with wrap_validation_error("category_select_override_params validation failed"):
-            self._resolved_category_params = type_validate_python(
+    def _validate_resolve_overrides(cls, values: dict[str, Any]) -> dict[str, Any]:  # noqa: N805
+        default_params: StickerGridParams = (
+            values.get("default_params") or StickerGridParams()
+        )
+        category_override_params: StickerGridParams = (
+            values.get("category_override_params") or StickerGridParams()
+        )
+        stickers_override_params: dict[str, StickerGridParams] = (
+            values.get("stickers_override_params") or {}
+        )
+
+        with wrap_validation_error(
+            "category_select_override_params validation failed",
+        ):
+            values["resolved_category_params"] = type_validate_python(
                 StickerGridParams,
                 deep_merge(
-                    type_dump_python(self.default_params, exclude_unset=True),
+                    type_dump_python(default_params, exclude_unset=True),
                     type_dump_python(
-                        self.category_override_params,
+                        category_override_params,
                         exclude_unset=True,
                     ),
                 ),
             )
-        for category, params in self.stickers_override_params.items():
+
+        resolved_stickers_params: dict[str, StickerGridParams] = {}
+        for category, params in stickers_override_params.items():
             with wrap_validation_error(
                 f"category {category} overridden StickerGridSetting validation failed",
             ):
-                self._resolved_stickers_params[category] = type_validate_python(
+                resolved_stickers_params[category] = type_validate_python(
                     StickerGridParams,
                     deep_merge(
-                        type_dump_python(self.default_params, exclude_unset=True),
+                        type_dump_python(default_params, exclude_unset=True),
                         type_dump_python(params, exclude_unset=True),
                     ),
                 )
-        return self
+        values["resolved_stickers_params"] = resolved_stickers_params
+
+        return values
 
 
 def merge_ensure_sticker_params(*params: StickerParamsOptional) -> StickerParams:
@@ -183,6 +206,24 @@ def merge_ensure_sticker_params(*params: StickerParamsOptional) -> StickerParams
     for param in params:
         kw.update(type_dump_python(param, exclude_defaults=True))
     return StickerParams(**kw)
+
+
+def find_sticker_by_name(
+    stickers: list[StickerInfo],
+    name: str,
+) -> Optional[StickerInfo]:
+    return next((x for x in stickers if x.name == name), None)
+
+
+def find_sticker(
+    stickers: list[StickerInfo],
+    query: Union[str, int],
+) -> Optional[StickerInfo]:
+    if isinstance(query, str) and (not query.isdigit()):
+        return find_sticker_by_name(stickers, query)
+    with suppress(IndexError):
+        return stickers[int(query)]
+    return None
 
 
 class StickerPackManifest(BaseModel):
@@ -196,16 +237,14 @@ class StickerPackManifest(BaseModel):
     external_fonts: list[StickerExternalFont] = []
     stickers: list[StickerInfoOptionalParams]
 
-    _resolved_stickers: list[StickerInfo] = PrivateAttr([])
-    _resolved_sample_sticker: Optional[StickerParams] = PrivateAttr(None)
-
-    @property
-    def resolved_stickers(self) -> list[StickerInfo]:
-        return self._resolved_stickers
+    resolved_stickers: list[StickerInfo] = []
+    resolved_sample_sticker_placeholder: Optional[StickerParams] = None
 
     @property
     def resolved_sample_sticker(self) -> StickerParams:
-        return self._resolved_sample_sticker or self.resolved_stickers[0].params
+        if self.resolved_sample_sticker_placeholder is None:
+            raise InvalidStateError
+        return self.resolved_sample_sticker_placeholder
 
     @property
     def resolved_stickers_by_category(self) -> dict[str, list[StickerInfo]]:
@@ -219,51 +258,62 @@ class StickerPackManifest(BaseModel):
         return merge_ensure_sticker_params(self.default_sticker_params, *args)
 
     def find_sticker_by_name(self, name: str) -> Optional[StickerInfo]:
-        return next(
-            (x for x in self.resolved_stickers if x.name == name),
-            None,
-        )
+        return find_sticker_by_name(self.resolved_stickers, name)
 
     def find_sticker(self, query: Union[str, int]) -> Optional[StickerInfo]:
-        if isinstance(query, str) and (not query.isdigit()):
-            return self.find_sticker_by_name(query)
-        with suppress(IndexError):
-            return self.resolved_stickers[int(query)]
-        return None
+        return find_sticker(self.resolved_stickers, query)
 
-    _validate_not_falsy = field_validator("name")(validate_not_falsy)
+    @field_validator("name")
+    def _validate_not_falsy(cls, v: str) -> str:  # noqa: N805
+        return validate_not_falsy(v)
 
     @model_validator(mode="after")
-    def _validate_resolve_stickers(self) -> Self:
+    def _validate_resolve_stickers(cls, values: dict[str, Any]) -> dict[str, Any]:  # noqa: N805
+        stickers: Optional[list[StickerInfoOptionalParams]] = values.get("stickers")
+        if not stickers:
+            raise ValueError("Stickers cannot be empty")
+
+        default_sticker_params: StickerParamsOptional = (
+            values.get("default_sticker_params") or StickerParamsOptional()
+        )
+
         def validate_info(sticker: StickerInfoOptionalParams) -> StickerInfo:
             return type_validate_python(
                 StickerInfo,
                 {
                     **type_dump_python(sticker, exclude={"params"}),
-                    "params": self.resolve_sticker_params(sticker.params),
+                    "params": merge_ensure_sticker_params(
+                        default_sticker_params,
+                        sticker.params,
+                    ),
                 },
             )
 
         resolved_stickers: list[StickerInfo] = []
-        for idx, x in enumerate(self.stickers):
+        for idx, x in enumerate(stickers):
             with wrap_validation_error(f"Sticker {idx} validation failed"):
                 resolved_stickers.append(validate_info(x))
-        self._resolved_stickers = resolved_stickers
+        values["resolved_stickers"] = resolved_stickers
 
-        if not self.sample_sticker:
-            self._resolved_sample_sticker = self.resolved_stickers[0].params
-        elif isinstance(self.sample_sticker, StickerInfoOptionalParams):
+        sample_sticker: Union[StickerInfoOptionalParams, str, int, None] = values.get(
+            "sample_sticker",
+        )
+        if not sample_sticker:
+            resolved_sample_sticker = resolved_stickers[0].params
+        elif isinstance(sample_sticker, StickerInfoOptionalParams):
             with wrap_validation_error("Sample sticker validation failed"):
-                self._resolved_sample_sticker = self.resolve_sticker_params(
-                    self.sample_sticker.params,
+                resolved_sample_sticker = merge_ensure_sticker_params(
+                    default_sticker_params,
+                    sample_sticker.params,
                 )
         else:
-            it = self.find_sticker(self.sample_sticker)
+            it = find_sticker(resolved_stickers, sample_sticker)
             if it is None:
-                raise ValueError(f"Sample sticker `{self.sample_sticker}` not found")
-            self._resolved_sample_sticker = it.params
+                raise ValueError(f"Sample sticker `{sample_sticker}` not found")
+            resolved_sample_sticker = it.params
+        values["resolved_sample_sticker_placeholder"] = resolved_sample_sticker
 
-        return self
+        return values
 
 
 ChecksumDict: TypeAlias = dict[str, str]

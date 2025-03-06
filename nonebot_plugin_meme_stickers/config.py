@@ -1,6 +1,7 @@
 import re
 from typing import Optional, cast
 
+import skia
 from cookit.nonebot.localstore import ensure_localstore_path_config
 from cookit.pyd import field_validator, get_alias_model
 from nonebot import get_plugin_config
@@ -78,13 +79,12 @@ class ConfigModel(BaseConfigModel):
     default_sticker_background: int = 0xFFFFFFFF
     default_sticker_image_format: SkiaEncodedImageFormatType = "png"
 
-    _validate_str_color = field_validator("default_sticker_background")(
-        resolve_color_to_tuple,
-    )
+    @field_validator("default_sticker_background", mode="before")
+    def _validate_str_color_to_int(cls, v: str) -> int:  # noqa: N805
+        return skia.Color(*resolve_color_to_tuple(str(v)))
 
 
 config: ConfigModel = get_plugin_config(ConfigModel)
-
 
 ensure_localstore_path_config()
 data_dir = get_plugin_data_dir()
