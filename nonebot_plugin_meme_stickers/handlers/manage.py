@@ -10,7 +10,7 @@ from nonebot.typing import T_State
 from nonebot_plugin_alconna import AlconnaMatcher, Query, UniMessage
 from nonebot_plugin_waiter import prompt
 
-from ..config import config
+from ..config import config, data_dir
 from ..consts import PREVIEW_CACHE_DIR_NAME
 from ..draw.grid import draw_sticker_grid_from_packs
 from ..draw.pack_list import draw_sticker_pack_grid
@@ -69,7 +69,7 @@ async def _(
             )
         async with exception_notify("下载用于预览的贴纸失败"):
             params = await temp_sticker_card_params(
-                config.data_dir / PREVIEW_CACHE_DIR_NAME,
+                data_dir / PREVIEW_CACHE_DIR_NAME,
                 hub,
                 manifests,
                 checksums,

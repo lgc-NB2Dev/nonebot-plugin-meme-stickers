@@ -216,6 +216,10 @@ Telegram：[@lgc2333](https://t.me/lgc2333)
 
 ## 📝 更新日志
 
+### 0.2.3
+
+- 修复一处失误造成的 Bug ([#3](https://github.com/lgc-NB2Dev/nonebot-plugin-meme-stickers/issues/3))
+
 ### 0.2.2
 
 - 修复不兼容 Pydantic 1 的问题
