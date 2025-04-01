@@ -29,6 +29,7 @@ class StickerPack:
     ):
         self.base_path = base_path
         self.state_change_callbacks = state_change_callbacks or []
+        self.updating_flag = False
 
         self._cached_merged_config: Optional[StickerPackConfig] = None
         self._ref_outdated = False
@@ -59,6 +60,10 @@ class StickerPack:
 
     @property
     def updating(self) -> bool:
+        return self.updating_flag or self.updating_flag_file_exists
+
+    @property
+    def updating_flag_file_exists(self) -> bool:
         return (self.base_path / UPDATING_FLAG_FILENAME).exists()
 
     @property

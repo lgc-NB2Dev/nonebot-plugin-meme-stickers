@@ -216,6 +216,10 @@ Telegram：[@lgc2333](https://t.me/lgc2333)
 
 ## 📝 更新日志
 
+### 0.2.4
+
+- 贴纸包的更新中状态会从开始下载文件持续到文件更新完成了，而不是仅从文件更新阶段持续到结束
+
 ### 0.2.3
 
 - 修复一处失误造成的 Bug ([#3](https://github.com/lgc-NB2Dev/nonebot-plugin-meme-stickers/issues/3))
