@@ -64,6 +64,7 @@ class StickerPack:
 
     @property
     def updating_flag_file_exists(self) -> bool:
+        """Files downloaded, doing file ops in pack folder"""
         return (self.base_path / UPDATING_FLAG_FILENAME).exists()
 
     @property
@@ -80,17 +81,20 @@ class StickerPack:
         return (
             self.merged_config.disabled
             or self.ref_outdated
-            or self.updating
+            or self.updating_flag_file_exists
             or self.deleted
         )
 
     @property
     def unavailable_reason(self) -> Optional[str]:
-        if self.updating:
-            return "更新中"
-        if (ro := self.ref_outdated) or self.deleted:
-            t = "引用过期" if ro else "已删除"
-            return f"异常状态: {t}"
+        if self.updating_flag_file_exists:
+            return "更新应用中"
+        if self.updating_flag:
+            return "更新下载中"
+        if self.ref_outdated:
+            return "异常状态: 引用过期"
+        if self.deleted:
+            return "异常状态: 已删除"
         if self.merged_config.disabled:
             return "已禁用"
         return None
@@ -195,6 +199,9 @@ class StickerPack:
             )
             return None
 
+        self.updating_flag = True
+        if notify:
+            self.call_callbacks()
         try:
             r = await update_sticker_pack(
                 self.base_path,
@@ -205,8 +212,10 @@ class StickerPack:
             )
             self.reload(notify=False)
         finally:
+            self.updating_flag = False
             if notify:
                 self.call_callbacks()
+
         return r
 
     def delete(self, notify: bool = True):

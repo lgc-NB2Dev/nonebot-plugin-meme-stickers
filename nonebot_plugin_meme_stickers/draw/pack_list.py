@@ -81,7 +81,7 @@ def make_sticker_pack_card_picture(
     )
     builder.pushStyle(title_style)
     title_parts = [name, "\n"]
-    if unavailable and unavailable_reason:
+    if unavailable_reason:
         title_parts.insert(0, f"[{unavailable_reason}] ")
     if index:
         title_parts.insert(0, f"{index}. ")

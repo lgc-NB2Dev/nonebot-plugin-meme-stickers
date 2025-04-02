@@ -193,7 +193,6 @@ async def update_packs(
             logger.warning(f"Pack `{p.slug}` is updating, skip")
             return None
 
-        p.updating_flag = True
         try:
             r = await p.update(force=force, **req_kw)
         except NotImplementedError:
@@ -210,8 +209,6 @@ async def update_packs(
             else:
                 op_info.skipped.append(OpIt(p, "无须更新"))
             return r
-        finally:
-            p.updating_flag = False
 
     # restrict update concurrency **counted by packs**
     sem = nullcontext() if req_kw.get("sem") else create_req_sem()

@@ -10,30 +10,36 @@ registered_commands: dict[str, set[str]] = {}
 
 @pack_manager.add_callback
 def reregister_shortcuts(_: StickerPackManager, pack: StickerPack):
-    available = not pack.unavailable
     registered = registered_commands.get(pack.slug)
-    new_commands = (
-        {
-            *pack.merged_config.commands,
-            *pack.merged_config.extend_commands,
-        }
-        if available
-        else None
-    )
+    if not registered:
+        registered = registered_commands[pack.slug] = set[str]()
+
+    available = not pack.unavailable
+    new_commands = {
+        *pack.merged_config.commands,
+        *pack.merged_config.extend_commands,
+    }
+    if available:
+        should_register = new_commands - registered
+        should_unregister = registered - new_commands
+    else:
+        should_register = None
+        should_unregister = registered.copy()
 
     logger.debug(
         f"Pack `{pack.slug}` state changed, reregistering shortcuts"
-        f" ({available=}, `{registered}` -> `{new_commands}`)",
+        f" - {registered} -> {new_commands}, {available=}"
+        f", {should_register=}, {should_unregister=}",
     )
 
-    if registered:
-        for x in registered:
-            msg = alc.shortcut(x, delete=True)
-            logger.debug(msg)
-        del registered_commands[pack.slug]
-
-    if new_commands:
-        for x in new_commands:
+    if should_register:
+        for x in should_register:
             msg = alc.shortcut(x, arguments=["generate", pack.slug], prefix=True)
             logger.debug(msg)
-        registered_commands[pack.slug] = new_commands
+            registered.add(x)
+
+    if should_unregister:
+        for x in should_unregister:
+            msg = alc.shortcut(x, delete=True)
+            logger.debug(msg)
+            registered.remove(x)
