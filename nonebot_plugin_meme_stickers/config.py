@@ -1,12 +1,11 @@
-import re
-from typing import Optional, cast
+from typing import TYPE_CHECKING, Optional, cast
 
 import skia
 from cookit.nonebot.localstore import ensure_localstore_path_config
-from cookit.pyd import field_validator, get_alias_model
+from cookit.pyd import field_validator, model_with_alias_generator
 from nonebot import get_plugin_config
 from nonebot_plugin_localstore import get_plugin_data_dir
-from pydantic import Field
+from pydantic import BaseModel, Field
 
 from .consts import (
     FLOAT_REGEX,
@@ -16,6 +15,9 @@ from .consts import (
     SkiaEncodedImageFormatType,
 )
 
+if TYPE_CHECKING:
+    import re
+
 
 def resolve_color_to_tuple(color: str) -> RGBAColorTuple:
     sm: Optional[re.Match[str]] = None
@@ -23,7 +25,7 @@ def resolve_color_to_tuple(color: str) -> RGBAColorTuple:
     if (sm := SHORT_HEX_COLOR_REGEX.fullmatch(color)) or (
         fm := FULL_HEX_COLOR_REGEX.fullmatch(color)
     ):
-        hex_str = (sm or cast(re.Match, fm))["hex"].upper()
+        hex_str = (sm or cast("re.Match", fm))["hex"].upper()
         if sm:
             hex_str = "".join([x * 2 for x in hex_str])
         hex_str = f"{hex_str}FF" if len(hex_str) == 6 else hex_str
@@ -57,10 +59,8 @@ def resolve_color_to_tuple(color: str) -> RGBAColorTuple:
     )
 
 
-BaseConfigModel = get_alias_model(lambda x: f"meme_stickers_{x}")
-
-
-class ConfigModel(BaseConfigModel):
+@model_with_alias_generator(lambda x: f"meme_stickers_{x}")
+class ConfigModel(BaseModel):
     proxy: Optional[str] = Field(None, alias="proxy")
 
     github_url_template: str = (

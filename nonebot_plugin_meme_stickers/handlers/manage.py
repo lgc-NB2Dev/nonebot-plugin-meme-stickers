@@ -39,9 +39,9 @@ alc.subcommand(
         help_text="显示 Hub 上的贴纸列表（仅限超级用户）",
     ),
     Option(
-        "-N|--no-unavailable",
+        "-a|--all",
         action=store_true,
-        help_text="不显示无法使用的贴纸包（仅限超级用户）",
+        help_text="显示所有贴纸包（也就是同时显示无法使用的包）（仅限超级用户）",
     ),
     help_text="查看本地或 Hub 上的贴纸包列表",
     alias=["ls", "ll", "l"],
@@ -53,7 +53,7 @@ async def _(
     bot: BaseBot,
     event: BaseEvent,
     q_online: Query[bool] = Query("~online.value", default=False),
-    q_no_unavailable: Query[bool] = Query("~no-unavailable.value", default=False),
+    q_all: Query[bool] = Query("~all.value", default=False),
 ):
     if q_online.result:
         if not await SUPERUSER(bot, event):
@@ -84,12 +84,10 @@ async def _(
             pic = save_image(draw_sticker_pack_grid(params), skia.kJPEG)
         await UniMessage.image(raw=pic).text("以上为 Hub 中可用的贴纸包列表").finish()
 
-    if q_no_unavailable.result and not await SUPERUSER(bot, event):
+    if q_all.result and not await SUPERUSER(bot, event):
         return
 
-    packs = (
-        pack_manager.available_packs if q_no_unavailable.result else pack_manager.packs
-    )
+    packs = pack_manager.packs if q_all.result else pack_manager.available_packs
     if not packs:
         await UniMessage("当前无可用贴纸包").finish()
     async with exception_notify("图片绘制失败"):  # fmt: skip
