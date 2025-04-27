@@ -5,6 +5,7 @@ import skia
 from arclet.alconna import Arg, Args, MultiVar, Option, store_true
 from cookit.nonebot.alconna import RecallContext
 from nonebot import logger
+from nonebot.adapters import Bot as BaseBot, Event as BaseEvent
 from nonebot.permission import SUPERUSER
 from nonebot.typing import T_State
 from nonebot_plugin_alconna import AlconnaMatcher, Query, UniMessage
@@ -35,24 +36,29 @@ alc.subcommand(
     Option(
         "-o|--online",
         action=store_true,
-        help_text="显示 Hub 上的贴纸列表",
+        help_text="显示 Hub 上的贴纸列表（仅限超级用户）",
     ),
     Option(
         "-N|--no-unavailable",
         action=store_true,
-        help_text="不显示无法使用的贴纸包",
+        help_text="不显示无法使用的贴纸包（仅限超级用户）",
     ),
-    help_text="查看本地或 Hub 上的贴纸包列表（仅超级用户）",
+    help_text="查看本地或 Hub 上的贴纸包列表",
     alias=["ls", "ll", "l"],
 )
 
 
-@m_cls.dispatch("~list", permission=SUPERUSER).handle()
+@m_cls.dispatch("~list").handle()
 async def _(
+    bot: BaseBot,
+    event: BaseEvent,
     q_online: Query[bool] = Query("~online.value", default=False),
     q_no_unavailable: Query[bool] = Query("~no-unavailable.value", default=False),
 ):
     if q_online.result:
+        if not await SUPERUSER(bot, event):
+            return
+
         async with exception_notify("从 Hub 获取贴纸包信息失败"):
             hub, manifests = await fetch_hub_and_packs()
         if not manifests:
@@ -77,6 +83,9 @@ async def _(
         async with exception_notify("图片绘制失败"):
             pic = save_image(draw_sticker_pack_grid(params), skia.kJPEG)
         await UniMessage.image(raw=pic).text("以上为 Hub 中可用的贴纸包列表").finish()
+
+    if q_no_unavailable.result and not await SUPERUSER(bot, event):
+        return
 
     packs = (
         pack_manager.available_packs if q_no_unavailable.result else pack_manager.packs
