@@ -2,6 +2,7 @@ from typing import Optional
 
 import skia
 from arclet.alconna import Arg, Args, Option, store_true
+from cookit.nonebot import exception_notify
 from cookit.pyd import model_copy
 from nonebot_plugin_alconna import AlconnaMatcher, Query, UniMessage
 from nonebot_plugin_waiter import prompt
@@ -20,7 +21,6 @@ from ..utils import resolve_relative_num
 from .shared import (
     alc,
     create_illegal_finisher,
-    exception_notify,
     find_dict_value_with_notify,
     find_packs_with_notify,
     handle_idx_command,
@@ -183,7 +183,7 @@ async def _(
 
     async with exception_notify(
         f"颜色 `{q_background.result}` 格式不正确",
-        (ValueError,),
+        types=(ValueError,),
     ):
         background = (
             skia.Color(*resolve_color_to_tuple(q_background.result))

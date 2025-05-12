@@ -3,6 +3,7 @@ from typing import Optional
 
 import skia
 from arclet.alconna import Arg, Args, MultiVar, Option, store_true
+from cookit.nonebot import exception_notify
 from cookit.nonebot.alconna import RecallContext
 from nonebot import logger
 from nonebot.adapters import Bot as BaseBot, Event as BaseEvent
@@ -29,7 +30,7 @@ from ..sticker_pack.pack import StickerPack
 from ..sticker_pack.update import UpdatedResourcesInfo
 from ..utils.file_source import create_req_sem
 from ..utils.operation import OpInfo, OpIt, format_op
-from .shared import alc, exception_notify, find_packs_with_notify, m_cls, timeout_finish
+from .shared import alc, find_packs_with_notify, m_cls, timeout_finish
 
 alc.subcommand(
     "list",

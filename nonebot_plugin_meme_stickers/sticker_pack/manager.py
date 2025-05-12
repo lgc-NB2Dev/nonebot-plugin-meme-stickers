@@ -159,7 +159,7 @@ class StickerPackManager:
                     raise
             else:
                 op_info.succeed.append(OpIt(pack))
-            return res
+                return res
 
         # restrict install concurrency **counted by packs**
         sem = nullcontext() if req_kw.get("sem") else create_req_sem()
@@ -169,7 +169,7 @@ class StickerPackManager:
                 return await do_install(info)
 
         res = await asyncio.gather(*(with_sem_install(x) for x in infos))
-        return op_info, {p.slug: v for p, v in zip(infos, res)}
+        return op_info, {p.slug: v for p, v in zip(infos, res) if v}
 
     async def update_all(self, force: bool = False, **req_kw: Unpack[ReqKwargs]):
         return await update_packs(self.packs, force=force, **req_kw)

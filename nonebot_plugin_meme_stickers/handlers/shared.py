@@ -1,13 +1,11 @@
 from collections.abc import Sequence
-from contextlib import asynccontextmanager
 from typing import Any, NoReturn, Optional, TypeVar
 
 import skia
 from arclet.alconna import Alconna, CommandMeta
+from cookit.nonebot import exception_notify
 from cookit.pyd import model_copy
-from nonebot import logger
 from nonebot.adapters import Message as BaseMessage
-from nonebot.exception import NoneBotException
 from nonebot_plugin_alconna import UniMessage, on_alconna
 from nonebot_plugin_waiter import prompt
 
@@ -42,22 +40,6 @@ COMMON_COMMANDS_TIP = "另外可以回复 0 来退出"
 
 RETURN_COMMANDS = ("r", "return", "b", "back", "返回", "上一步")
 RETURN_COMMAND_TIP = "回复 r 来返回上一步"
-
-
-@asynccontextmanager
-async def exception_notify(
-    msg: str,
-    types: Optional[tuple[type[BaseException]]] = None,
-):
-    try:
-        yield
-    except NoneBotException:
-        raise
-    except Exception as e:
-        if types and (not isinstance(e, types)):
-            raise
-        logger.exception(msg.format(e=str(e), type=type(e).__name__))
-        await UniMessage(msg).finish()
 
 
 async def exit_finish() -> NoReturn:
