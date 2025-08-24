@@ -15,8 +15,8 @@
 _✨ 一站式制作 PJSK 样式表情包 ✨_
 
 <img src="https://img.shields.io/badge/python-3.10+-blue.svg" alt="python">
-<a href="https://pdm.fming.dev">
-  <img src="https://img.shields.io/badge/pdm-managed-blueviolet" alt="pdm-managed">
+<a href="https://github.com/astral-sh/uv">
+  <img src="https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/uv/main/assets/badge/v0.json" alt="uv">
 </a>
 <a href="https://wakatime.com/badge/user/b61b0f9a-f40b-4c82-bc51-0a75c67bfccf/project/be33a081-a5da-46f6-86f2-2f2b3e3b8ba5">
   <img src="https://wakatime.com/badge/user/b61b0f9a-f40b-4c82-bc51-0a75c67bfccf/project/be33a081-a5da-46f6-86f2-2f2b3e3b8ba5.svg" alt="wakatime">
