@@ -6,13 +6,12 @@ from typing import (
     Any,
     Generic,
     Literal,
-    Optional,
     Protocol,
+    TypeAlias,
     TypedDict,
     TypeVar,
-    Union,
 )
-from typing_extensions import TypeAlias, Unpack
+from typing_extensions import Unpack
 
 from cookit import TypeDecoCollector, copy_func_arg_annotations, nullcontext
 from httpx import AsyncClient
@@ -30,7 +29,7 @@ class FileSourceGitHubBase(BaseModel):
     type: Literal["github"] = "github"
     owner: str
     repo: str
-    path: Optional[str] = None
+    path: str | None = None
 
 
 class FileSourceGitHubBranch(FileSourceGitHubBase):
@@ -41,7 +40,7 @@ class FileSourceGitHubTag(FileSourceGitHubBase):
     tag: str
 
 
-FileSourceGitHub: TypeAlias = Union[FileSourceGitHubBranch, FileSourceGitHubTag]
+FileSourceGitHub: TypeAlias = FileSourceGitHubBranch | FileSourceGitHubTag
 
 
 class FileSourceURL(BaseModel):
@@ -49,19 +48,15 @@ class FileSourceURL(BaseModel):
     url: str
 
 
-FileSource: TypeAlias = Union[
-    FileSourceGitHubBranch,
-    FileSourceGitHubTag,
-    FileSourceURL,
-]
+FileSource: TypeAlias = FileSourceGitHubBranch | FileSourceGitHubTag | FileSourceURL
 
 M = TypeVar("M", bound=FileSource)
 M_contra = TypeVar("M_contra", bound=FileSource, contravariant=True)
 
 
 class ReqKwargs(TypedDict, total=False):
-    cli: Optional[AsyncClient]
-    sem: Optional[asyncio.Semaphore]
+    cli: AsyncClient | None
+    sem: asyncio.Semaphore | None
 
 
 class SourceFetcher(Protocol, Generic[M_contra]):
@@ -90,7 +85,7 @@ def create_req_sem():
 
 
 @asynccontextmanager
-async def with_cli(cli: Optional[AsyncClient] = None):
+async def with_cli(cli: AsyncClient | None = None):
     ctx = create_client() if cli is None else nullcontext(cli)
     async with ctx as x:
         yield x

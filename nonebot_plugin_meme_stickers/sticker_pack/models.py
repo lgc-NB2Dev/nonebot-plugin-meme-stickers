@@ -1,8 +1,7 @@
 from asyncio import InvalidStateError
 from contextlib import contextmanager, suppress
 from textwrap import indent
-from typing import Any, Optional, TypeVar, Union
-from typing_extensions import TypeAlias
+from typing import Any, TypeAlias, TypeVar
 
 from cookit import deep_merge
 from cookit.pyd import (
@@ -60,20 +59,20 @@ class StickerParams(BaseModel):
 
 
 class StickerParamsOptional(BaseModel):
-    width: Optional[int] = None
-    height: Optional[int] = None
-    base_image: Optional[str] = None
-    text: Optional[str] = None
-    text_x: Optional[float] = None
-    text_y: Optional[float] = None
-    text_align: Optional[SkiaTextAlignType] = None
-    text_rotate_degrees: Optional[float] = None
-    text_color: Optional[RGBAColorTuple] = None
-    stroke_color: Optional[RGBAColorTuple] = None
-    stroke_width_factor: Optional[float] = None
-    font_size: Optional[float] = None
-    font_style: Optional[SkiaFontStyleType] = None
-    font_families: Optional[list[str]] = None
+    width: int | None = None
+    height: int | None = None
+    base_image: str | None = None
+    text: str | None = None
+    text_x: float | None = None
+    text_y: float | None = None
+    text_align: SkiaTextAlignType | None = None
+    text_rotate_degrees: float | None = None
+    text_color: RGBAColorTuple | None = None
+    stroke_color: RGBAColorTuple | None = None
+    stroke_width_factor: float | None = None
+    font_size: float | None = None
+    font_style: SkiaFontStyleType | None = None
+    font_families: list[str] | None = None
 
 
 class StickerInfoOptionalParams(BaseModel):
@@ -98,7 +97,7 @@ class StickerExternalFont(BaseModel):
 
 
 class StickerPackConfig(BaseModel):
-    update_source: Optional[FileSource] = None
+    update_source: FileSource | None = None
     disabled: bool = False
     commands: list[str] = []
     extend_commands: list[str] = []
@@ -107,10 +106,10 @@ class StickerPackConfig(BaseModel):
 class StickerGridParams(BaseModel):
     padding: StickerGridPaddingType = 16
     gap: StickerGridGapType = 16
-    rows: Optional[int] = None
-    cols: Optional[int] = 5
-    background: Union[RGBAColorTuple, str] = (40, 44, 52, 255)
-    sticker_size_fixed: Optional[tuple[int, int]] = None
+    rows: int | None = None
+    cols: int | None = 5
+    background: RGBAColorTuple | str = (40, 44, 52, 255)
+    sticker_size_fixed: tuple[int, int] | None = None
 
     @model_validator(mode="after")
     def _validate_rows_cols(cls, values: dict[str, Any]) -> dict[str, Any]:  # noqa: N805
@@ -118,8 +117,8 @@ class StickerGridParams(BaseModel):
         cols_exists = "cols" in values
         if rows_exists and not cols_exists:
             values["cols"] = None
-        rows_have_no_val: Optional[int] = values.get("rows") is None
-        cols_have_no_val: Optional[int] = values.get("cols", 5) is None
+        rows_have_no_val: int | None = values.get("rows") is None
+        cols_have_no_val: int | None = values.get("cols", 5) is None
         if (rows_have_no_val and cols_have_no_val) or (
             (not rows_have_no_val) and (not cols_have_no_val)
         ):
@@ -131,7 +130,7 @@ class StickerGridParams(BaseModel):
 
     @property
     def resolved_padding(self) -> TRBLPaddingTuple:
-        if isinstance(self.padding, (int, float)):
+        if isinstance(self.padding, int | float):
             return ((p := self.padding), p, p, p)
         if len(self.padding) == 1:
             return ((p := self.padding[0]), p, p, p)
@@ -142,7 +141,7 @@ class StickerGridParams(BaseModel):
 
     @property
     def resolved_gap(self) -> XYGapTuple:
-        if isinstance(self.gap, (int, float)):
+        if isinstance(self.gap, int | float):
             return ((g := self.gap), g)
         if len(self.gap) == 1:
             return ((g := self.gap[0]), g)
@@ -211,14 +210,14 @@ def merge_ensure_sticker_params(*params: StickerParamsOptional) -> StickerParams
 def find_sticker_by_name(
     stickers: list[StickerInfo],
     name: str,
-) -> Optional[StickerInfo]:
+) -> StickerInfo | None:
     return next((x for x in stickers if x.name == name), None)
 
 
 def find_sticker(
     stickers: list[StickerInfo],
-    query: Union[str, int],
-) -> Optional[StickerInfo]:
+    query: str | int,
+) -> StickerInfo | None:
     if isinstance(query, str) and (not query.isdigit()):
         return find_sticker_by_name(stickers, query)
     with suppress(IndexError):
@@ -233,12 +232,12 @@ class StickerPackManifest(BaseModel):
     default_config: StickerPackConfig = StickerPackConfig()
     default_sticker_params: StickerParamsOptional = StickerParamsOptional()
     sticker_grid: StickerGridSetting = StickerGridSetting()
-    sample_sticker: Union[StickerInfoOptionalParams, str, int, None] = None
+    sample_sticker: StickerInfoOptionalParams | str | int | None = None
     external_fonts: list[StickerExternalFont] = []
     stickers: list[StickerInfoOptionalParams]
 
     resolved_stickers: list[StickerInfo] = []
-    resolved_sample_sticker_placeholder: Optional[StickerParams] = None
+    resolved_sample_sticker_placeholder: StickerParams | None = None
 
     @property
     def resolved_sample_sticker(self) -> StickerParams:
@@ -257,10 +256,10 @@ class StickerPackManifest(BaseModel):
     def resolve_sticker_params(self, *args: StickerParamsOptional) -> StickerParams:
         return merge_ensure_sticker_params(self.default_sticker_params, *args)
 
-    def find_sticker_by_name(self, name: str) -> Optional[StickerInfo]:
+    def find_sticker_by_name(self, name: str) -> StickerInfo | None:
         return find_sticker_by_name(self.resolved_stickers, name)
 
-    def find_sticker(self, query: Union[str, int]) -> Optional[StickerInfo]:
+    def find_sticker(self, query: str | int) -> StickerInfo | None:
         return find_sticker(self.resolved_stickers, query)
 
     @field_validator("name")
@@ -269,7 +268,7 @@ class StickerPackManifest(BaseModel):
 
     @model_validator(mode="after")
     def _validate_resolve_stickers(cls, values: dict[str, Any]) -> dict[str, Any]:  # noqa: N805
-        stickers: Optional[list[StickerInfoOptionalParams]] = values.get("stickers")
+        stickers: list[StickerInfoOptionalParams] | None = values.get("stickers")
         if not stickers:
             raise ValueError("Stickers cannot be empty")
 
@@ -295,7 +294,7 @@ class StickerPackManifest(BaseModel):
                 resolved_stickers.append(validate_info(x))
         values["resolved_stickers"] = resolved_stickers
 
-        sample_sticker: Union[StickerInfoOptionalParams, str, int, None] = values.get(
+        sample_sticker: StickerInfoOptionalParams | str | int | None = values.get(
             "sample_sticker",
         )
         if not sample_sticker:
@@ -317,7 +316,7 @@ class StickerPackManifest(BaseModel):
 
 
 ChecksumDict: TypeAlias = dict[str, str]
-OptionalChecksumDict: TypeAlias = dict[str, Optional[str]]
+OptionalChecksumDict: TypeAlias = dict[str, str | None]
 
 
 class HubStickerPackInfo(BaseModel):
@@ -331,8 +330,8 @@ HubManifest: TypeAlias = list[HubStickerPackInfo]
 def zoom_sticker(
     params: StickerParams,
     zoom: float,
-    width: Optional[int] = None,
-    height: Optional[int] = None,
+    width: int | None = None,
+    height: int | None = None,
 ) -> StickerParams:
     params.width = width or round(params.width * zoom)
     params.height = height or round(params.height * zoom)

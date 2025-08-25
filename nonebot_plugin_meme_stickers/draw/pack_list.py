@@ -1,6 +1,5 @@
 import math
 from pathlib import Path
-from typing import Optional
 from typing_extensions import NotRequired, TypedDict, Unpack
 
 import skia
@@ -51,9 +50,9 @@ class StickerPackCardParams(TypedDict):
     name: str
     slug: str
     description: str
-    index: NotRequired[Optional[str]]
+    index: NotRequired[str | None]
     unavailable: NotRequired[bool]
-    unavailable_reason: NotRequired[Optional[str]]
+    unavailable_reason: NotRequired[str | None]
 
 
 def make_sticker_pack_card_picture(

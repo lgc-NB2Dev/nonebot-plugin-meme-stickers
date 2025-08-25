@@ -1,6 +1,5 @@
 import asyncio
 from pathlib import Path
-from typing import Optional
 from typing_extensions import Unpack
 
 from cookit.loguru import warning_suppress
@@ -47,7 +46,7 @@ async def fetch_manifest(
 async def fetch_optional_manifest(
     source: FileSource,
     **req_kw: Unpack[ReqKwargs],
-) -> Optional[StickerPackManifest]:
+) -> StickerPackManifest | None:
     with warning_suppress(f"Failed to fetch manifest from {source}"):
         return await fetch_manifest(source, **req_kw)
     return None
@@ -66,7 +65,7 @@ async def fetch_checksum(
 async def fetch_optional_checksum(
     source: FileSource,
     **req_kw: Unpack[ReqKwargs],
-) -> Optional[ChecksumDict]:
+) -> ChecksumDict | None:
     with warning_suppress(f"Failed to fetch checksum from {source}"):
         return await fetch_checksum(source, **req_kw)
     return None
@@ -89,7 +88,7 @@ async def temp_sticker_card_params(
     cache_dir: Path,
     hub: HubManifest,
     manifests: dict[str, StickerPackManifest],
-    checksums: Optional[dict[str, ChecksumDict]] = None,
+    checksums: dict[str, ChecksumDict] | None = None,
     **req_kw: Unpack[ReqKwargs],
 ) -> list[StickerPackCardParams]:
     async def task(i: int, info: HubStickerPackInfo):

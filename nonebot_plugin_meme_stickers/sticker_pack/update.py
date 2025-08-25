@@ -1,10 +1,11 @@
 import asyncio
 import shutil
+from collections.abc import Callable
 from contextlib import contextmanager, nullcontext
 from dataclasses import dataclass
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from typing import Any, Callable, Optional
+from typing import Any
 from typing_extensions import Unpack
 
 from cookit.pyd import type_validate_json
@@ -68,8 +69,8 @@ class UpdatedResourcesInfo:
 async def update_sticker_pack(
     pack_path: Path,
     source: FileSource,
-    manifest: Optional[StickerPackManifest] = None,
-    file_update_start_callback: Optional[Callable[[], Any]] = None,
+    manifest: StickerPackManifest | None = None,
+    file_update_start_callback: Callable[[], Any] | None = None,
     **req_kw: Unpack[ReqKwargs],
 ):
     slug = pack_path.name

@@ -1,5 +1,4 @@
 import asyncio
-from typing import Optional
 
 import skia
 from arclet.alconna import Arg, Args, MultiVar, Option, store_true
@@ -189,7 +188,7 @@ alc.subcommand(
 @m_cls.dispatch("~update", permission=SUPERUSER).handle()
 async def _(
     m: AlconnaMatcher,
-    q_packs: Query[Optional[list[str]]] = Query("~packs", None),
+    q_packs: Query[list[str] | None] = Query("~packs", None),
     q_all: Query[bool] = Query("~all.value", default=False),
     q_force: Query[bool] = Query("~force.value", default=False),
 ):

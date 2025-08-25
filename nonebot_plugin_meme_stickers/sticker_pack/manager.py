@@ -1,7 +1,8 @@
 import asyncio
+from collections.abc import Callable
 from pathlib import Path
-from typing import Any, Callable, Optional, TypeVar, Union
-from typing_extensions import TypeAlias, Unpack
+from typing import Any, TypeAlias, TypeVar
+from typing_extensions import Unpack
 
 from cookit import nullcontext
 from cookit.loguru import warning_suppress
@@ -27,7 +28,7 @@ class StickerPackManager:
         base_path: Path,
         init_auto_load: bool = False,
         init_load_clear_updating_flags: bool = False,
-        state_change_callbacks: Optional[list[PackStateChangedCbFromManager]] = None,
+        state_change_callbacks: list[PackStateChangedCbFromManager] | None = None,
     ) -> None:
         self.base_path = base_path
         self.packs: list[StickerPack] = []
@@ -70,7 +71,7 @@ class StickerPackManager:
         for x in self.packs.copy():
             x.set_ref_outdated()
 
-        op_info = OpInfo[Union[str, StickerPack]]()
+        op_info = OpInfo[str | StickerPack]()
 
         if not self.base_path.exists():
             logger.info("Data dir not exist, skip load")
@@ -104,7 +105,7 @@ class StickerPackManager:
         self,
         checker: Callable[[StickerPack], bool],
         include_unavailable: bool = False,
-    ) -> Optional[StickerPack]:
+    ) -> StickerPack | None:
         packs = self.packs if include_unavailable else self.available_packs
         return next((x for x in packs if checker(x)), None)
 
@@ -112,7 +113,7 @@ class StickerPackManager:
         self,
         slug: str,
         include_unavailable: bool = False,
-    ) -> Optional[StickerPack]:
+    ) -> StickerPack | None:
         return self.find_pack_with_checker(
             lambda x: x.slug == slug,
             include_unavailable,
@@ -122,7 +123,7 @@ class StickerPackManager:
         self,
         query: str,
         include_unavailable: bool = False,
-    ) -> Optional[StickerPack]:
+    ) -> StickerPack | None:
         query = query.lower()
         packs = self.packs if include_unavailable else self.available_packs
         if query.isdigit() and 1 <= (x := int(query)) <= len(packs):
@@ -135,13 +136,13 @@ class StickerPackManager:
     async def install(
         self,
         infos: list[HubStickerPackInfo],
-        manifest: Optional[StickerPackManifest] = None,
+        manifest: StickerPackManifest | None = None,
         **req_kw: Unpack[ReqKwargs],
-    ) -> tuple[OpInfo[Union[StickerPack, str]], dict[str, UpdatedResourcesInfo]]:
+    ) -> tuple[OpInfo[StickerPack | str], dict[str, UpdatedResourcesInfo]]:
         if p := next((self.find_pack_by_slug(x.slug) for x in infos), None):
             raise ValueError(f"Pack `{p.slug}` already loaded")
 
-        op_info = OpInfo[Union[StickerPack, str]]()
+        op_info = OpInfo[StickerPack | str]()
 
         async def do_install(info: HubStickerPackInfo):
             pack_path = self.base_path / info.slug

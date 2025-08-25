@@ -1,5 +1,5 @@
 from collections.abc import Sequence
-from typing import Any, NoReturn, Optional, TypeVar
+from typing import Any, NoReturn, TypeVar
 
 import skia
 from arclet.alconna import Alconna, CommandMeta
@@ -51,7 +51,7 @@ async def timeout_finish() -> NoReturn:
 
 
 async def handle_prompt_common_commands(
-    msg: Optional[BaseMessage],
+    msg: BaseMessage | None,
 ) -> tuple[str, BaseMessage]:
     if not msg:
         await timeout_finish()
@@ -74,7 +74,7 @@ def create_illegal_finisher():
     return func
 
 
-def handle_idx_command(txt: str, items: Sequence[T]) -> Optional[T]:
+def handle_idx_command(txt: str, items: Sequence[T]) -> T | None:
     if txt.isdigit() and (1 <= (idx := int(txt)) <= len(items)):
         return items[idx - 1]
     return None
@@ -201,7 +201,7 @@ async def category_and_sticker_select(pack: StickerPack) -> StickerInfo:
             await illegal_finish()
             await UniMessage("未找到对应分类，请重新发送").send()
 
-    async def select_sticker(category: str) -> Optional[StickerInfo]:
+    async def select_sticker(category: str) -> StickerInfo | None:
         """category select requested when return None"""
 
         category_params = pack.manifest.sticker_grid.resolved_stickers_params

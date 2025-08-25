@@ -1,6 +1,6 @@
 import math
+from collections.abc import Callable
 from pathlib import Path
-from typing import Callable, Optional, Union
 
 import skia
 
@@ -212,7 +212,7 @@ def make_stroke_paint(color: int, width: float) -> skia.Paint:
     return paint
 
 
-def read_file_to_skia_image(path: Union[Path, str]) -> skia.Image:
+def read_file_to_skia_image(path: Path | str) -> skia.Image:
     if isinstance(path, Path):
         path = str(path)
     return skia.Image.MakeFromEncoded(skia.Data.MakeFromFileName(path))
@@ -220,7 +220,7 @@ def read_file_to_skia_image(path: Union[Path, str]) -> skia.Image:
 
 def make_surface_for_picture(
     picture: skia.Picture,
-    background: Optional[int] = None,
+    background: int | None = None,
 ) -> skia.Surface:
     bounds = picture.cullRect()
     s = skia.Surface(math.floor(bounds.width()), math.floor(bounds.height()))
@@ -245,9 +245,9 @@ def get_black_n_white_filter_paint() -> skia.Paint:
 
 def save_image(
     surface: skia.Surface,
-    image_type: Union[skia.EncodedImageFormat, SkiaEncodedImageFormatType],
+    image_type: skia.EncodedImageFormat | SkiaEncodedImageFormatType,
     quality: int = 95,
-    background: Optional[int] = None,
+    background: int | None = None,
 ):
     image_type = (
         IMAGE_FORMAT_MAP[image_type] if isinstance(image_type, str) else image_type
@@ -268,8 +268,8 @@ def text_to_picture(
     text: str,
     padding: int = 32,
     font_size: int = 32,
-    font_families: Optional[list[str]] = None,
-    font_style: Optional[skia.FontStyle] = None,
+    font_families: list[str] | None = None,
+    font_style: skia.FontStyle | None = None,
     text_align: skia.textlayout_TextAlign = skia.textlayout_TextAlign.kLeft,
     background: int = DEFAULT_BACKGROUND_COLOR,
     foreground: int = DEFAULT_TEXT_COLOR,

@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, Optional, cast
+from typing import TYPE_CHECKING, cast
 
 import skia
 from cookit.nonebot.localstore import ensure_localstore_path_config
@@ -20,8 +20,8 @@ if TYPE_CHECKING:
 
 
 def resolve_color_to_tuple(color: str) -> RGBAColorTuple:
-    sm: Optional[re.Match[str]] = None
-    fm: Optional[re.Match[str]] = None
+    sm: re.Match[str] | None = None
+    fm: re.Match[str] | None = None
     if (sm := SHORT_HEX_COLOR_REGEX.fullmatch(color)) or (
         fm := FULL_HEX_COLOR_REGEX.fullmatch(color)
     ):
@@ -61,7 +61,7 @@ def resolve_color_to_tuple(color: str) -> RGBAColorTuple:
 
 @model_with_alias_generator(lambda x: f"meme_stickers_{x}")
 class ConfigModel(BaseModel):
-    proxy: Optional[str] = Field(None, alias="proxy")
+    proxy: str | None = Field(None, alias="proxy")
 
     github_url_template: str = (
         "https://raw.githubusercontent.com/{owner}/{repo}/{ref_path}/{path}"

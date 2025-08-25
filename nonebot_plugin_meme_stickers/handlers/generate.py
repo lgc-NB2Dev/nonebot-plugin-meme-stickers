@@ -1,5 +1,3 @@
-from typing import Optional
-
 import skia
 from arclet.alconna import Arg, Args, Option, store_true
 from cookit.nonebot import exception_notify
@@ -132,27 +130,27 @@ async def prompt_sticker_text() -> str:
 async def _(
     m: AlconnaMatcher,
     # args
-    q_pack: Query[Optional[str]] = Query("~pack", None),
-    q_sticker: Query[Optional[str]] = Query("~sticker", None),
-    q_text: Query[Optional[str]] = Query("~text", None),
+    q_pack: Query[str | None] = Query("~pack", None),
+    q_sticker: Query[str | None] = Query("~sticker", None),
+    q_text: Query[str | None] = Query("~text", None),
     # opts with args
-    q_x: Query[Optional[str]] = Query("~x.x", None),
-    q_y: Query[Optional[str]] = Query("~y.y", None),
-    q_align: Query[Optional[str]] = Query("~align.align", None),
-    q_rotate: Query[Optional[str]] = Query("~rotate.rotate", None),
-    q_color: Query[Optional[str]] = Query("~color.color", None),
-    q_stroke_color: Query[Optional[str]] = Query("~stroke_color.stroke_color", None),
-    q_stroke_width_factor: Query[Optional[str]] = Query(
+    q_x: Query[str | None] = Query("~x.x", None),
+    q_y: Query[str | None] = Query("~y.y", None),
+    q_align: Query[str | None] = Query("~align.align", None),
+    q_rotate: Query[str | None] = Query("~rotate.rotate", None),
+    q_color: Query[str | None] = Query("~color.color", None),
+    q_stroke_color: Query[str | None] = Query("~stroke_color.stroke_color", None),
+    q_stroke_width_factor: Query[str | None] = Query(
         "~stroke_width_factor.stroke_width_factor",
         None,
     ),
-    q_font_size: Query[Optional[str]] = Query("~font_size.font_size", None),
-    q_font_style: Query[Optional[str]] = Query("~font_style.font_style", None),
-    q_image_format: Query[Optional[str]] = Query("~image_format.image_format", None),
-    q_background: Query[Optional[str]] = Query("~background.background", default=None),
+    q_font_size: Query[str | None] = Query("~font_size.font_size", None),
+    q_font_style: Query[str | None] = Query("~font_style.font_style", None),
+    q_image_format: Query[str | None] = Query("~image_format.image_format", None),
+    q_background: Query[str | None] = Query("~background.background", None),
     # opts without args
-    q_auto_resize: Query[Optional[bool]] = Query("~auto-resize.value", None),
-    q_no_auto_resize: Query[Optional[bool]] = Query("~no-auto-resize.value", None),
+    q_auto_resize: Query[bool | None] = Query("~auto-resize.value", None),
+    q_no_auto_resize: Query[bool | None] = Query("~no-auto-resize.value", None),
     q_debug: Query[bool] = Query("~debug.value", default=False),
 ):
     if q_align.result and (q_align.result not in TEXT_ALIGN_MAP):

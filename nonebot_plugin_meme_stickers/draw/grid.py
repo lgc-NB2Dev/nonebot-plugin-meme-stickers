@@ -1,6 +1,5 @@
 import math
 from pathlib import Path
-from typing import Optional, Union
 
 import skia
 from cookit import chunks
@@ -25,10 +24,10 @@ def draw_sticker_grid(
     stickers: list[StickerParams],
     padding: TRBLPaddingTuple = (16, 16, 16, 16),
     gap: XYGapTuple = (16, 16),
-    rows: Optional[int] = None,
-    cols: Optional[int] = 5,
-    background: Union[skia.Image, int] = DEFAULT_BACKGROUND_COLOR,
-    sticker_size_fixed: Optional[tuple[int, int]] = None,
+    rows: int | None = None,
+    cols: int | None = 5,
+    background: skia.Image | int = DEFAULT_BACKGROUND_COLOR,
+    sticker_size_fixed: tuple[int, int] | None = None,
     debug: bool = False,
 ) -> skia.Surface:
     if (rows and cols) or ((rows is None) and (cols is None)):

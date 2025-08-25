@@ -1,8 +1,9 @@
 import shutil
+from collections.abc import Callable
 from functools import cached_property
 from pathlib import Path
-from typing import Any, Callable, Optional, TypeVar
-from typing_extensions import TypeAlias, Unpack
+from typing import Any, TypeAlias, TypeVar
+from typing_extensions import Unpack
 
 from cookit import deep_merge
 from cookit.pyd import type_dump_python, type_validate_json
@@ -24,14 +25,14 @@ class StickerPack:
     def __init__(
         self,
         base_path: Path,
-        state_change_callbacks: Optional[list[PackStateChangedCb]] = None,
+        state_change_callbacks: list[PackStateChangedCb] | None = None,
         init_notify: bool = True,
     ):
         self.base_path = base_path
         self.state_change_callbacks = state_change_callbacks or []
         self.updating_flag = False
 
-        self._cached_merged_config: Optional[StickerPackConfig] = None
+        self._cached_merged_config: StickerPackConfig | None = None
         self._ref_outdated = False
 
         self.reload_manifest(notify=False)
@@ -53,7 +54,7 @@ class StickerPack:
         return self.base_path / CONFIG_FILENAME
 
     @cached_property
-    def hub_manifest_info(self) -> Optional[HubStickerPackInfo]:
+    def hub_manifest_info(self) -> HubStickerPackInfo | None:
         if not (s := self.merged_config.update_source):
             return None
         return HubStickerPackInfo(slug=self.slug, source=s)
@@ -86,7 +87,7 @@ class StickerPack:
         )
 
     @property
-    def unavailable_reason(self) -> Optional[str]:
+    def unavailable_reason(self) -> str | None:
         if self.updating_flag_file_exists:
             return "更新应用中"
         if self.updating_flag:
@@ -179,11 +180,11 @@ class StickerPack:
 
     async def update(
         self,
-        manifest: Optional[StickerPackManifest] = None,
+        manifest: StickerPackManifest | None = None,
         notify: bool = True,
         force: bool = False,
         **req_kw: Unpack[ReqKwargs],
-    ) -> Optional[UpdatedResourcesInfo]:
+    ) -> UpdatedResourcesInfo | None:
         s = self.merged_config.update_source
         if not s:
             raise NotImplementedError("This pack has no update source")

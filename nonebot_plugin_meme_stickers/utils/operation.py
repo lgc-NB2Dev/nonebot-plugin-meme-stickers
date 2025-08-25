@@ -1,5 +1,6 @@
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Any, Callable, Generic, Optional, TypeVar
+from typing import Any, Generic, TypeVar
 from typing_extensions import override
 
 from cookit import TypeDecoCollector
@@ -13,8 +14,8 @@ T2 = TypeVar("T2")
 @dataclass
 class OpIt(Generic[T]):
     value: T
-    info: Optional[str] = None
-    exc: Optional[BaseException] = None
+    info: str | None = None
+    exc: BaseException | None = None
 
 
 @dataclass

@@ -1,6 +1,5 @@
 import re
-from typing import Literal, Union
-from typing_extensions import TypeAlias
+from typing import Literal, TypeAlias
 
 SkiaTextAlignType: TypeAlias = Literal[
     "center", "end", "justify", "left", "right", "start",
@@ -9,18 +8,9 @@ SkiaFontStyleType: TypeAlias = Literal["bold", "bold_italic", "italic", "normal"
 SkiaEncodedImageFormatType: TypeAlias = Literal["jpeg", "png", "webp"]
 RGBAColorTuple: TypeAlias = tuple[int, int, int, int]
 TRBLPaddingTuple: TypeAlias = tuple[float, float, float, float]
-StickerGridPaddingType: TypeAlias = Union[
-    float,  # t r b l
-    tuple[float],  # (t r b l)
-    tuple[float, float],  # (t b, l r)
-    tuple[float, float, float, float],  # (t, r, b, l)
-]
+StickerGridPaddingType: TypeAlias = float | tuple[float] | tuple[float, float] | tuple[float, float, float, float]
 XYGapTuple: TypeAlias = tuple[float, float]
-StickerGridGapType: TypeAlias = Union[
-    float,  # x and y
-    tuple[float],  # (x and y)
-    tuple[float, float],  # (x, y)
-]
+StickerGridGapType: TypeAlias = float | tuple[float] | tuple[float, float]
 
 NAME = "Meme Stickers"
 DESCRIPTION = "一站式制作 PJSK 样式表情包"
