@@ -195,6 +195,16 @@ plugins = [
 如果你想制作自定义贴纸包，请参考 [meme-stickers-hub](https://github.com/lgc-NB2Dev/meme-stickers-hub)  
 也欢迎把你的贴纸包贡献给我们~
 
+## 🤔 Q & A
+
+### 加载插件失败，出现 `libEGL.so.1` 缺失相关字样如何解决？
+
+请参考 [issue #5](https://github.com/lgc-NB2Dev/nonebot-plugin-meme-stickers/issues/5)
+
+### Windows 下无报错直接崩溃？Linux 字体显示异常？
+
+请参考 [MemeCrafters/meme-generator #已知问题](https://github.com/MemeCrafters/meme-generator#%E5%B7%B2%E7%9F%A5%E9%97%AE%E9%A2%98)
+
 ## 📞 联系
 
 QQ：3076823485  
